@@ -150,10 +150,122 @@ class TrafficMap{
     ROAD_DEFS.forEach(([a,b])=>{const n1=NODES[a],n2=NODES[b],dx=n2.x-n1.x,dy=n2.y-n1.y,len=Math.hypot(dx,dy),ang=Math.atan2(dy,dx)*180/Math.PI;const r=document.createElement('div');r.className='road';r.dataset.k=rKey(a,b);r.style.cssText=`left:${n1.x}%;top:${n1.y}%;width:${len}%;transform:rotate(${ang}deg)`;r.addEventListener('mouseenter',e=>this._showRoadTip(e,r));r.addEventListener('mousemove',e=>{const t=document.getElementById('vTip');t.style.left=(e.clientX+12)+'px';t.style.top=(e.clientY-50)+'px'});r.addEventListener('mouseleave',()=>document.getElementById('vTip').style.display='none');this.container.appendChild(r);this.roadEls[rKey(a,b)]=r});
     Object.keys(NODES).forEach(id=>{const n=NODES[id],el=document.createElement('div');el.className='node';el.style.left=n.x+'%';el.style.top=n.y+'%';this.container.appendChild(el)})
   }
-  _showRoadTip(e,r){const t=document.getElementById('vTip'),k=r.dataset.k,m=ROAD_META[k]||{name:k},rt=this.roadTraffic[k]||{now:0};const st=r.classList.contains('congested')?'혼잡':r.classList.contains('predicted')?'혼잡예측':r.classList.contains('ai-ctrl')?'AI제어':r.classList.contains('emergency')?'긴급':'정상';t.innerHTML=`<b>${m.name}</b><div class="tr">현재 혼잡도<span>${rt.now}%</span></div><div class="tr">상태<span>${st}</span></div><div class="tr">차량 제어<span>${this.isAI?'phase+횡단보도 AI 조정':'고정 phase'}</span></div>`;t.style.display='block';t.style.left=(e.clientX+12)+'px';t.style.top=(e.clientY-50)+'px'}
-  initTraffic(scen){this.curScen=scen;const base=SCEN_BASE[scen]||42;ROAD_DEFS.forEach(([a,b],idx)=>{const k=rKey(a,b),boost=(SCEN_ROAD_BOOST[scen]&&SCEN_ROAD_BOOST[scen][k])||0,aiReduction=this.isAI?(boost>0?boost*.45:0):0,seed=clamp(base+boost-aiReduction+((idx%5)-2)*3,10,96);this.roadTraffic[k]={now:Math.round(seed),hist:[seed-4,seed-2,seed],pastAvg:seed}});this._applyRoadClasses(scen)}
+  _showRoadTip(e,r){
+    const t=document.getElementById('vTip'),k=r.dataset.k,m=ROAD_META[k]||{name:k},rt=this.roadTraffic[k]||{now:0};
+    const st=r.classList.contains('congested')?'혼잡':r.classList.contains('predicted')?'혼잡예측':r.classList.contains('ai-ctrl')?'AI제어':r.classList.contains('emergency')?'긴급':'정상';
+    t.innerHTML=`<b>${m.name}</b>
+      <div class="tr">현재 혼잡도<span>${rt.now}%</span></div>
+      <div class="tr">도로 위 차량<span>${rt.vehicleCount||0}대</span></div>
+      <div class="tr">정지/감속<span>${(rt.stoppedCount||0)+(rt.slowCount||0)}대</span></div>
+      <div class="tr">상황 영향<span>${rt.eventImpact||0}</span></div>
+      <div class="tr">상태<span>${st}</span></div>
+      <div class="tr">계산 방식<span>차량수+정지+상황</span></div>
+      <div class="tr">차량 제어<span>${this.isAI?'phase+횡단보도 AI 조정':'고정 phase'}</span></div>`;
+    t.style.display='block';
+    t.style.left=(e.clientX+12)+'px';
+    t.style.top=(e.clientY-50)+'px'
+  }
+  initTraffic(scen){this.curScen=scen;const base=SCEN_BASE[scen]||42;ROAD_DEFS.forEach(([a,b],idx)=>{const k=rKey(a,b),boost=(SCEN_ROAD_BOOST[scen]&&SCEN_ROAD_BOOST[scen][k])||0,aiReduction=this.isAI?(boost>0?boost*.45:0):0,seed=clamp(base+boost-aiReduction+((idx%5)-2)*3,10,96);this.roadTraffic[k]={now:Math.round(seed),hist:[seed-4,seed-2,seed],pastAvg:seed,vehicleCount:0,stoppedCount:0,slowCount:0}});this._applyRoadClasses(scen)}
   _applyRoadClasses(scen){Object.values(this.roadEls).forEach(r=>r.className='road');const aiRoads=SCEN_AI_ROADS[scen]||[],emRoads=SCEN_EMERG_ROADS[scen]||[];Object.keys(this.roadTraffic).forEach(k=>{const r=this.roadEls[k];if(!r)return;const v=this.roadTraffic[k].now;if(emRoads.includes(k)&&this.isAI){r.classList.add('emergency');return}if(aiRoads.includes(k)&&this.isAI){r.classList.add('ai-ctrl');return}if(v>=70)r.classList.add('congested');else if(v>=52)r.classList.add('predicted')});if(scen==='accident'&&this.isAI)['E-I','I-J','J-K','F-K'].forEach(k=>this.roadEls[k]?.classList.add('detour'))}
-  updateTraffic(){const scen=this.curScen,base=SCEN_BASE[scen]||42;Object.keys(this.roadTraffic).forEach(k=>{const rt=this.roadTraffic[k],boost=(SCEN_ROAD_BOOST[scen]&&SCEN_ROAD_BOOST[scen][k])||0,aiReduction=this.isAI?(boost>0?boost*.45:0):0,past=rt.hist.reduce((a,b)=>a+b,0)/rt.hist.length,noise=(Math.random()-.5)*5,systemBias=this.isAI?-6:8,target=clamp(base+boost-aiReduction+systemBias,8,96),next=clamp(rt.now*.42+past*.25+target*.33+noise,8,98);rt.now=Math.round(next);rt.pastAvg=Math.round(past);rt.hist.push(rt.now);if(rt.hist.length>10)rt.hist.shift()});this._applyRoadClasses(scen)}
+  updateTraffic(){
+    const scen=this.curScen,base=SCEN_BASE[scen]||42;
+    const roadStats={};
+
+    // 모든 도로 초기화
+    ROAD_DEFS.forEach(([a,b])=>{
+      const k=rKey(a,b);
+      roadStats[k]={count:0,stopped:0,slow:0};
+    });
+
+    // 실제 차량이 현재 올라가 있는 도로를 카운트
+    this.vehicles.forEach(v=>{
+      if(!v.path||v.path.length<2)return;
+      const a=v.path[v.seg];
+      const b=v.path[(v.seg+1)%v.path.length];
+      const k=rKey(a,b);
+      if(!roadStats[k])roadStats[k]={count:0,stopped:0,slow:0};
+
+      roadStats[k].count++;
+      if(v.stopped)roadStats[k].stopped++;
+      if(v.braking || (v.speed||0)<(v.baseSpeed||0)*0.55)roadStats[k].slow++;
+    });
+
+    Object.keys(this.roadTraffic).forEach((k,idx)=>{
+      const rt=this.roadTraffic[k];
+      const st=roadStats[k]||{count:0,stopped:0,slow:0};
+
+      const boost=(SCEN_ROAD_BOOST[scen]&&SCEN_ROAD_BOOST[scen][k])||0;
+      const aiRoad=(SCEN_AI_ROADS[scen]||[]).includes(k);
+      const emergencyRoad=(SCEN_EMERG_ROADS[scen]||[]).includes(k);
+
+      // 기본 배경 혼잡도: 시나리오 영향은 남기되, 실제 차량 수가 더 크게 작동
+      let background=this.isAI?18:26;
+      if(scen==='accident')background+=this.isAI?8:16;
+      if(scen==='metro')background+=this.isAI?6:10;
+      if(scen==='emergency')background+=this.isAI?5:10;
+
+      // 실제 차량 기반 혼잡도
+      // 차가 많을수록, 정지/감속 차량이 많을수록 크게 증가
+      let vehicleLoad=st.count*(this.isAI?9:12);
+      let stopLoad=st.stopped*(this.isAI?13:18);
+      let slowLoad=st.slow*(this.isAI?7:10);
+
+      // 사고/지하철 등 특정 도로 보정
+      let eventLoad=boost*(this.isAI?0.45:0.85);
+
+      // 사고·공사 구간은 차가 적어도 '막혀서 못 들어가는 병목'이므로 별도 차단 가중치 부여
+      let blockageLoad=0;
+      if(scen==='accident'){
+        if(k==='F-G')blockageLoad=this.isAI?38:58;       // 사고 발생 핵심 구간
+        if(['B-C','C-G','G-K','G-H'].includes(k))blockageLoad+=this.isAI?12:24; // 사고 여파 구간
+        if(['B-G','F-K','F-J','E-I','I-J','J-K'].includes(k)&&this.isAI)blockageLoad+=8; // AI 우회 유입
+      }
+
+      // 지하철 도착 시 역 주변은 차량 수가 적어도 수요 증가 영향이 남도록 함
+      if(scen==='metro'&&['G-K','C-G','G-H','J-K'].includes(k)){
+        blockageLoad+=this.isAI?10:18;
+      }
+
+      // 긴급차량 상황에서는 일반 시스템 쪽 경로 주변 혼잡/대기 영향 유지
+      if(scen==='emergency'&&['A-B','B-C','C-D','D-H','H-L'].includes(k)){
+        blockageLoad+=this.isAI?0:18;
+      }
+
+      // AI 제어 도로는 차량이 있어도 흐름이 좋으면 혼잡도가 과하게 오르지 않도록 보정
+      let controlBonus=0;
+      if(this.isAI&&aiRoad)controlBonus+=12;
+      if(this.isAI&&emergencyRoad)controlBonus+=24;
+
+      let raw=background+vehicleLoad+stopLoad+slowLoad+eventLoad+blockageLoad-controlBonus;
+
+      // 빈 도로 처리
+      // 평상시 빈 도로는 낮게, 사고/공사/역세권 병목 도로는 차량이 없어도 혼잡 원인을 유지
+      if(st.count===0){
+        if(blockageLoad>0||boost>18){
+          raw=background+eventLoad*.75+blockageLoad-controlBonus*.45;
+        }else{
+          raw=this.isAI?clamp(background+eventLoad*.25-controlBonus*.4,8,34):clamp(background+eventLoad*.35,12,42);
+        }
+      }
+
+      // 일반 시스템은 정체 누적이 조금 더 크게, AI는 흐름 개선이 조금 더 크게
+      raw+=this.isAI?-3:7;
+
+      // 급격한 변화를 줄이기 위해 이전값과 새 계산값을 섞음
+      const next=clamp(rt.now*.55+raw*.45,8,98);
+
+      rt.now=Math.round(next);
+      rt.vehicleCount=st.count;
+      rt.stoppedCount=st.stopped;
+      rt.slowCount=st.slow;
+      rt.eventImpact=Math.round(eventLoad+blockageLoad);
+      rt.pastAvg=Math.round((rt.pastAvg||rt.now)*.7+rt.now*.3);
+      rt.hist.push(rt.now);
+      if(rt.hist.length>10)rt.hist.shift();
+    });
+
+    this._applyRoadClasses(scen)
+  }
   avgCongestion(){const vals=Object.values(this.roadTraffic).map(x=>x.now);return vals.length?Math.round(vals.reduce((a,b)=>a+b,0)/vals.length):42}
   createSig(nodeId,managed=false,profile={}){
     const n=NODES[nodeId],wrap=document.createElement('div');wrap.className='sig-wrap';wrap.style.left=(n.x+1.8)+'%';wrap.style.top=(n.y-6.4)+'%';
