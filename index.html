@@ -3,988 +3,255 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>중앙 AI 도시 교통 통합 관제 — AI 전/후 비교</title>
+<title>중앙 AI 도시 교통 통합 관제 — 현실 신호/횡단보도 비교</title>
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&family=JetBrains+Mono:wght@400;700&display=swap');
-
 :root{
-  --bg:#060d1a;
-  --panel:#0b1628;
-  --panel2:#0f1e35;
-  --border:#1e3050;
-  --text:#e8f4ff;
-  --muted:#6888aa;
-  --road:#2e4060;
-  --red:#e84040;
-  --yellow:#f5c518;
-  --blue:#1ab8e8;
-  --green:#22e87a;
-  --orange:#f07830;
-  --purple:#a060f8;
-  --divider:#162540;
+  --bg:#060d1a;--panel:#0b1628;--panel2:#0f1e35;--border:#1e3050;
+  --text:#e8f4ff;--muted:#7f9bbb;--road:#314868;--red:#e84040;
+  --yellow:#f5c518;--blue:#1ab8e8;--green:#22e87a;--orange:#f07830;
+  --purple:#a060f8;--divider:#162540;
 }
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%;overflow:hidden}
-body{background:var(--bg);color:var(--text);font-family:'Noto Sans KR',system-ui,sans-serif;font-size:13px}
-
-/* ── 헤더 ── */
-#header{
-  height:52px;display:flex;align-items:center;justify-content:space-between;
-  padding:0 20px;background:#080f1e;border-bottom:1px solid var(--border);
-  position:relative;z-index:100;flex-shrink:0;
-}
+body{background:var(--bg);color:var(--text);font-family:Arial,"Noto Sans KR",system-ui,sans-serif;font-size:13px}
+#header{height:52px;display:flex;align-items:center;justify-content:space-between;padding:0 20px;background:#080f1e;border-bottom:1px solid var(--border);position:relative;z-index:100;flex-shrink:0}
 #header h1{font-size:15px;font-weight:900;letter-spacing:-.4px;color:#cde8ff}
 #header h1 span{color:var(--blue)}
-.hright{display:flex;align-items:center;gap:12px}
-.scen-btns{display:flex;gap:6px}
-.sbtn{
-  height:32px;padding:0 14px;border:1px solid var(--border);border-radius:8px;
-  background:#0f1e35;color:var(--muted);font-size:12px;font-weight:700;
-  cursor:pointer;transition:all .18s;font-family:inherit;white-space:nowrap;
-}
+.hright{display:flex;align-items:center;gap:12px}.scen-btns{display:flex;gap:6px}
+.sbtn{height:32px;padding:0 14px;border:1px solid var(--border);border-radius:8px;background:#0f1e35;color:var(--muted);font-size:12px;font-weight:800;cursor:pointer;transition:all .18s;white-space:nowrap}
 .sbtn:hover{border-color:var(--blue);color:var(--text);background:#162a40}
 .sbtn.active{border-color:var(--blue);color:var(--blue);background:#0d2238;box-shadow:0 0 10px rgba(26,184,232,.2)}
 .pulse-dot{width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 8px var(--green);animation:blink 1.4s ease-in-out infinite}
-@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
-.live-label{font-size:11px;color:var(--green);font-family:'JetBrains Mono',monospace;font-weight:700}
-
-/* ── 메인 레이아웃 ── */
-#app{
-  display:grid;grid-template-columns:1fr 1fr 260px;
-  height:calc(100vh - 52px);gap:0;
-}
-.map-col{
-  position:relative;overflow:hidden;
-  border-right:1px solid var(--divider);
-}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}.live-label{font-size:11px;color:var(--green);font-family:monospace;font-weight:800}
+#app{display:grid;grid-template-columns:1fr 1fr 270px;height:calc(100vh - 52px);gap:0}
+.map-col{position:relative;overflow:hidden;border-right:1px solid var(--divider)}
 .map-col:last-of-type{border-right:2px solid #1e3a5c}
-
-/* ── 지도 라벨 헤더 ── */
-.map-header{
-  position:absolute;top:0;left:0;right:0;z-index:50;
-  display:flex;align-items:center;justify-content:space-between;
-  padding:10px 14px;
-  background:linear-gradient(to bottom,rgba(6,13,26,.95) 70%,transparent);
-}
-.map-label-no{
-  font-size:13px;font-weight:900;color:var(--muted);
-  border:1px solid var(--border);border-radius:6px;padding:4px 10px;
-  background:#080f1e;letter-spacing:.5px;
-}
-.map-label-ai{
-  font-size:13px;font-weight:900;color:var(--blue);
-  border:1px solid var(--blue);border-radius:6px;padding:4px 10px;
-  background:rgba(26,184,232,.08);letter-spacing:.5px;
-  box-shadow:0 0 12px rgba(26,184,232,.15);
-}
-.map-congestion{
-  font-size:12px;font-family:'JetBrains Mono',monospace;font-weight:700;
-  color:var(--yellow);
-}
-
-/* ── 지도 캔버스 영역 ── */
-.map-area{
-  position:absolute;inset:0;
-  background:#070e1c;
-  background-image:
-    linear-gradient(rgba(20,40,65,.35) 1px,transparent 1px),
-    linear-gradient(90deg,rgba(20,40,65,.35) 1px,transparent 1px);
-  background-size:54px 54px;
-}
-.zone-lbl{
-  position:absolute;color:#4a6882;font-size:11px;font-weight:700;
-  background:rgba(8,15,28,.75);border:1px solid #1e3050;border-radius:20px;
-  padding:4px 8px;z-index:6;pointer-events:none;
-}
-
-/* ── 도로 ── */
-.road{
-  position:absolute;height:22px;background:var(--road);
-  border-radius:999px;transform-origin:left center;
-  border:1px solid rgba(255,255,255,.06);z-index:2;
-  transition:background .35s,height .25s;cursor:pointer;
-}
-.road::after{
-  content:"";position:absolute;left:8px;right:8px;top:50%;
-  border-top:1.5px dashed rgba(255,255,255,.18);transform:translateY(-50%);
-}
-.road.congested{background:var(--red);height:26px;z-index:3}
-.road.predicted{background:var(--yellow);height:26px;z-index:3}
-.road.ai-ctrl{background:var(--blue);height:28px;z-index:4}
-.road.emergency{background:var(--green);height:30px;z-index:5}
-.road.detour{outline:3px dashed var(--orange);outline-offset:2px}
-.road:hover{filter:brightness(1.4)}
-
-/* ── 신호등 ── */
-.sig-wrap{position:absolute;z-index:15;display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer}
-.sig-box{width:16px;height:36px;background:#050c18;border:1px solid #1e3050;border-radius:6px;display:flex;flex-direction:column;gap:2px;padding:3px;position:relative}
-.sig-lbl{font-size:8px;color:var(--muted);background:#050c18;padding:1px 3px;border-radius:3px;white-space:nowrap;font-family:'JetBrains Mono',monospace}
+.map-header{position:absolute;top:0;left:0;right:0;z-index:70;display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:linear-gradient(to bottom,rgba(6,13,26,.96) 70%,transparent)}
+.map-label-no,.map-label-ai{font-size:13px;font-weight:900;border-radius:6px;padding:5px 10px;background:#080f1e;letter-spacing:.3px}
+.map-label-no{color:var(--muted);border:1px solid var(--border)}
+.map-label-ai{color:var(--blue);border:1px solid var(--blue);background:rgba(26,184,232,.08);box-shadow:0 0 12px rgba(26,184,232,.18)}
+.map-congestion{font-size:12px;font-family:monospace;font-weight:800;color:var(--yellow)}
+.map-area{position:absolute;inset:0;background:#070e1c;background-image:linear-gradient(rgba(20,40,65,.35) 1px,transparent 1px),linear-gradient(90deg,rgba(20,40,65,.35) 1px,transparent 1px);background-size:54px 54px}
+.zone-lbl{position:absolute;color:#5b7894;font-size:11px;font-weight:800;background:rgba(8,15,28,.78);border:1px solid #1e3050;border-radius:20px;padding:4px 8px;z-index:6;pointer-events:none}
+.road{position:absolute;height:28px;background:var(--road);border-radius:999px;transform-origin:left center;border:1px solid rgba(255,255,255,.08);z-index:2;transition:background .35s,height .25s;cursor:pointer}
+.road::after{content:"";position:absolute;left:9px;right:9px;top:50%;border-top:2px dashed rgba(255,255,255,.2);transform:translateY(-50%)}
+.road.congested{background:var(--red);height:32px;z-index:3}.road.predicted{background:var(--yellow);height:32px;z-index:3}
+.road.ai-ctrl{background:var(--blue);height:34px;z-index:4}.road.emergency{background:var(--green);height:36px;z-index:5}
+.road.detour{outline:3px dashed var(--orange);outline-offset:3px}.road:hover{filter:brightness(1.4)}
+.node{position:absolute;width:18px;height:18px;margin-left:-9px;margin-top:-9px;border-radius:50%;background:#07101d;border:2px solid #55718d;z-index:8}
+.sig-wrap{position:absolute;z-index:30;display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer}
+.sig-box{width:18px;height:42px;background:#050c18;border:1px solid #244467;border-radius:6px;display:flex;flex-direction:column;gap:2px;padding:3px;position:relative}
+.sig-lbl{font-size:8px;color:#a9bdd2;background:#050c18;padding:1px 4px;border-radius:3px;white-space:nowrap;font-family:monospace}
 .lite{border-radius:50%;flex:1;background:#101e30;transition:background .15s,box-shadow .15s}
-.lite.r.on{background:var(--red);box-shadow:0 0 8px rgba(232,64,64,.8)}
-.lite.y.on{background:var(--yellow);box-shadow:0 0 6px rgba(245,197,24,.8)}
-.lite.g.on{background:var(--green);box-shadow:0 0 8px rgba(34,232,122,.8),0 0 18px rgba(34,232,122,.3)}
-.sig-ai-badge{position:absolute;top:-5px;right:-5px;width:10px;height:10px;border-radius:50%;background:var(--blue);border:1.5px solid #060d1a}
-
-/* ── 노드 ── */
-.node{position:absolute;width:16px;height:16px;margin-left:-8px;margin-top:-8px;border-radius:50%;background:#070f1e;border:2px solid #3a5570;z-index:8}
-
-/* ── 차량 ── */
-.veh{position:absolute;z-index:18;font-size:13px;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:opacity .15s;user-select:none}
-.veh:hover{z-index:30;filter:drop-shadow(0 0 5px #38c7e8)}
-.veh.stopped{opacity:.5}
-.veh.braking{opacity:.75}
-
-/* ── 마커 ── */
-.mkr{position:absolute;z-index:22;transform:translate(-50%,-50%);background:#060d1a;border:1px solid var(--border);border-radius:8px;padding:4px 8px;font-size:10px;font-weight:900;white-space:nowrap;pointer-events:none}
-.mkr.red{color:var(--red);border-color:var(--red)}
-.mkr.blue{color:var(--blue);border-color:var(--blue)}
-.mkr.green{color:var(--green);border-color:var(--green)}
-.mkr.yellow{color:var(--yellow);border-color:var(--yellow)}
-.mkr.orange{color:var(--orange);border-color:var(--orange)}
-
-/* ── 효과 배지 ── */
-.effect-badge{
-  position:absolute;z-index:25;transform:translate(-50%,-50%);
-  border:1.5px solid var(--blue);border-radius:8px;background:rgba(6,13,26,.9);
-  padding:4px 8px;font-size:10px;font-weight:900;color:#a8e8ff;white-space:nowrap;
-  animation:effPop 2s ease-in-out infinite;pointer-events:none;
-}
-@keyframes effPop{0%,100%{opacity:.8;transform:translate(-50%,-50%) scale(1)}50%{opacity:1;transform:translate(-50%,-50%) scale(1.05)}}
-
-/* ── 우측 패널 ── */
-#side{
-  background:#080f1e;border-left:2px solid #1e3a5c;
-  display:flex;flex-direction:column;overflow:hidden;
-}
-.side-section{padding:14px 14px 10px;border-bottom:1px solid var(--divider);flex-shrink:0}
-.side-section:last-child{border-bottom:none;flex:1;overflow:hidden;display:flex;flex-direction:column}
-.sec-title{font-size:11px;font-weight:900;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:10px;display:flex;align-items:center;gap:6px}
-.sec-title::before{content:"";width:3px;height:11px;background:var(--blue);border-radius:2px;display:inline-block}
-
-/* 효과 카드 */
-.effect-cards{display:grid;grid-template-columns:1fr 1fr;gap:6px}
-.ec{background:var(--panel2);border:1px solid var(--border);border-radius:10px;padding:10px;text-align:center}
-.ec .ev{font-size:20px;font-weight:900;color:var(--green);margin-bottom:2px;font-family:'JetBrains Mono',monospace;transition:color .4s}
-.ec .ev.red{color:var(--red)}
-.ec .el{font-size:10px;color:var(--muted);line-height:1.4}
-.ec.highlight{border-color:var(--blue);background:rgba(26,184,232,.06)}
-.ec.highlight .ev{color:var(--blue)}
-
-/* AI 판단 흐름 */
-.flow-steps{display:flex;flex-direction:column;gap:6px}
-.fs{display:flex;gap:8px;align-items:flex-start;opacity:.35;transition:opacity .3s}
-.fs.active{opacity:1}
-.fs-num{width:22px;height:22px;border-radius:50%;background:#0f1e35;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:900;color:var(--blue);flex-shrink:0}
-.fs.active .fs-num{background:rgba(26,184,232,.15);border-color:var(--blue)}
-.fs-text b{display:block;font-size:11px;margin-bottom:2px}
-.fs-text span{font-size:10px;color:var(--muted);line-height:1.4}
-
-/* 로그 */
-.log-scroll{overflow-y:auto;flex:1}
-.log-scroll::-webkit-scrollbar{width:3px}
-.log-scroll::-webkit-scrollbar-track{background:transparent}
-.log-scroll::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
-.log-item{display:flex;gap:6px;padding:5px 0;border-bottom:1px solid rgba(30,48,80,.5);align-items:flex-start;animation:slideIn .25s forwards}
-@keyframes slideIn{from{opacity:0;transform:translateX(4px)}to{opacity:1;transform:none}}
-.li-time{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--muted);flex-shrink:0;margin-top:1px}
-.li-arrow{color:var(--blue);font-weight:900;flex-shrink:0;font-size:10px}
-.li-text{font-size:10px;color:#c0d8f0;line-height:1.4}
-.li-tag{font-size:9px;font-weight:900;padding:1px 5px;border-radius:3px;flex-shrink:0}
-.li-tag.ai{background:rgba(26,184,232,.2);color:var(--blue)}
-.li-tag.warn{background:rgba(232,64,64,.2);color:var(--red)}
-.li-tag.ok{background:rgba(34,232,122,.15);color:var(--green)}
-
-/* 이벤트 스트림 */
-.event-list{display:flex;flex-direction:column;gap:4px}
-.ev-item{display:grid;grid-template-columns:18px 1fr auto;gap:6px;align-items:center;background:#0a1525;border:1px solid var(--border);border-radius:6px;padding:5px 7px;font-size:10px;animation:slideIn .2s forwards}
-.ev-item small{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--muted)}
-
-/* 툴팁 */
-.tip{position:fixed;z-index:300;background:#09162a;border:1px solid var(--blue);border-radius:10px;padding:9px 12px;font-size:11px;pointer-events:none;min-width:180px;box-shadow:0 4px 20px rgba(0,0,0,.6);display:none}
-.tip b{display:block;color:var(--blue);margin-bottom:5px;font-size:12px}
-.tip .tr{display:flex;justify-content:space-between;gap:10px;margin-top:2px;color:var(--muted)}
-.tip .tr span{color:var(--text);font-weight:700}
-.tip-green{border-color:var(--green)}
-.tip-green b{color:var(--green)}
-
-/* 비교 바 */
-.cmp-bar{margin-top:8px}
-.cmp-row2{display:grid;grid-template-columns:70px 1fr 1fr;gap:4px;align-items:center;margin-bottom:5px;font-size:10px}
-.cmp-label{color:var(--muted)}
-.cmp-no,.cmp-yes{padding:3px 7px;border-radius:4px;text-align:center;font-weight:700;font-size:10px}
-.cmp-no{background:#1a2a40;color:var(--muted);border:1px solid var(--border)}
-.cmp-yes{background:rgba(26,184,232,.12);color:var(--blue);border:1px solid rgba(26,184,232,.3)}
-
-/* 공정성 */
-.fair-row{display:flex;align-items:center;gap:6px;margin-bottom:5px;font-size:10px}
-.fair-label{width:44px;color:var(--muted);flex-shrink:0}
-.fair-track{flex:1;height:5px;background:#07101d;border-radius:999px;overflow:hidden}
-.fair-fill{height:100%;background:var(--purple);width:0%;transition:width .9s cubic-bezier(.22,1,.36,1);border-radius:999px}
-.fair-val{width:24px;text-align:right;font-weight:700;color:var(--text)}
-
-@media(max-width:1100px){body{overflow:auto}#app{grid-template-columns:1fr;height:auto}}
+.lite.r.on{background:var(--red);box-shadow:0 0 8px rgba(232,64,64,.85)}.lite.y.on{background:var(--yellow);box-shadow:0 0 6px rgba(245,197,24,.85)}.lite.g.on{background:var(--green);box-shadow:0 0 9px rgba(34,232,122,.9),0 0 18px rgba(34,232,122,.35)}
+.sig-ai-badge{position:absolute;top:-6px;right:-6px;width:11px;height:11px;border-radius:50%;background:var(--blue);border:1.5px solid #060d1a}
+.phase-tag{position:absolute;transform:translate(-50%,-50%);z-index:31;background:#07101dcc;border:1px solid #2b4a70;border-radius:999px;padding:2px 6px;font-size:9px;font-weight:900;color:#dcefff;pointer-events:none}
+.crosswalk-on-road{position:absolute;left:50%;top:50%;width:38px;height:42px;transform:translate(-50%,-50%);z-index:20;pointer-events:auto;cursor:pointer;border-radius:4px;background:repeating-linear-gradient(0deg,rgba(255,255,255,.96) 0 4px,transparent 4px 8px);box-shadow:0 0 8px rgba(255,255,255,.28)}
+.crosswalk-on-road::after{content:"";position:absolute;left:-2px;right:-2px;top:50%;border-top:1px solid rgba(255,255,255,.65);transform:translateY(-50%)}
+.ped-sig{position:absolute;left:50%;top:-42px;z-index:55;transform:translateX(-50%);background:#07101d;border:1px solid #395878;border-radius:8px;padding:4px 8px;font-size:10px;font-weight:900;color:var(--red);box-shadow:0 2px 10px rgba(0,0,0,.55);cursor:pointer;white-space:nowrap;letter-spacing:.2px;pointer-events:auto}
+.ped-sig.walk{color:var(--green);border-color:var(--green);box-shadow:0 0 10px rgba(34,232,122,.35)}
+.veh{position:absolute;z-index:40;font-size:18px;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:opacity .15s,filter .15s;user-select:none;filter:drop-shadow(0 2px 3px rgba(0,0,0,.55))}
+.veh:hover{z-index:80;filter:drop-shadow(0 0 7px #38c7e8) brightness(1.15)}.veh.stopped{opacity:.62}.veh.braking{opacity:.82}
+.mkr{position:absolute;z-index:45;transform:translate(-50%,-50%);background:#060d1a;border:1px solid var(--border);border-radius:8px;padding:4px 8px;font-size:10px;font-weight:900;white-space:nowrap;pointer-events:none}
+.mkr.red{color:var(--red);border-color:var(--red)}.mkr.blue{color:var(--blue);border-color:var(--blue)}.mkr.green{color:var(--green);border-color:var(--green)}.mkr.yellow{color:var(--yellow);border-color:var(--yellow)}.mkr.orange{color:var(--orange);border-color:var(--orange)}
+.effect-badge{position:absolute;z-index:46;transform:translate(-50%,-50%);border:1.5px solid var(--blue);border-radius:8px;background:rgba(6,13,26,.9);padding:4px 8px;font-size:10px;font-weight:900;color:#a8e8ff;white-space:nowrap;animation:effPop 2s ease-in-out infinite;pointer-events:none}
+@keyframes effPop{0%,100%{opacity:.82;transform:translate(-50%,-50%) scale(1)}50%{opacity:1;transform:translate(-50%,-50%) scale(1.05)}}
+#side{background:#080f1e;border-left:2px solid #1e3a5c;display:flex;flex-direction:column;overflow:hidden}
+.side-section{padding:13px 14px 10px;border-bottom:1px solid var(--divider);flex-shrink:0}.side-section:last-child{border-bottom:none;flex:1;overflow:hidden;display:flex;flex-direction:column}
+.sec-title{font-size:11px;font-weight:900;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:9px;display:flex;align-items:center;gap:6px}.sec-title::before{content:"";width:3px;height:11px;background:var(--blue);border-radius:2px;display:inline-block}
+.effect-cards{display:grid;grid-template-columns:1fr 1fr;gap:6px}.ec{background:var(--panel2);border:1px solid var(--border);border-radius:10px;padding:9px;text-align:center}.ec .ev{font-size:20px;font-weight:900;color:var(--green);margin-bottom:2px;font-family:monospace}.ec .el{font-size:10px;color:var(--muted);line-height:1.35}.ec.highlight{border-color:var(--blue);background:rgba(26,184,232,.06)}.ec.highlight .ev{color:var(--blue)}
+.cmp-row2{display:grid;grid-template-columns:70px 1fr 1fr;gap:4px;align-items:center;margin-bottom:5px;font-size:10px}.cmp-label{color:var(--muted)}.cmp-no,.cmp-yes{padding:3px 6px;border-radius:4px;text-align:center;font-weight:800;font-size:10px}.cmp-no{background:#1a2a40;color:var(--muted);border:1px solid var(--border)}.cmp-yes{background:rgba(26,184,232,.12);color:var(--blue);border:1px solid rgba(26,184,232,.3)}
+.flow-steps{display:flex;flex-direction:column;gap:6px}.fs{display:flex;gap:8px;align-items:flex-start;opacity:.35;transition:opacity .3s}.fs.active{opacity:1}.fs-num{width:22px;height:22px;border-radius:50%;background:#0f1e35;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:900;color:var(--blue);flex-shrink:0}.fs.active .fs-num{background:rgba(26,184,232,.15);border-color:var(--blue)}.fs-text b{display:block;font-size:11px;margin-bottom:2px}.fs-text span{font-size:10px;color:var(--muted);line-height:1.35}
+.fair-row{display:flex;align-items:center;gap:6px;margin-bottom:5px;font-size:10px}.fair-label{width:44px;color:var(--muted);flex-shrink:0}.fair-track{flex:1;height:5px;background:#07101d;border-radius:999px;overflow:hidden}.fair-fill{height:100%;background:var(--purple);width:0%;transition:width .9s cubic-bezier(.22,1,.36,1);border-radius:999px}.fair-val{width:24px;text-align:right;font-weight:800;color:var(--text)}
+.event-list{display:flex;flex-direction:column;gap:4px}.ev-item{display:grid;grid-template-columns:18px 1fr auto;gap:6px;align-items:center;background:#0a1525;border:1px solid var(--border);border-radius:6px;padding:5px 7px;font-size:10px}.ev-item small{font-family:monospace;font-size:9px;color:var(--muted)}
+.log-scroll{overflow-y:auto;flex:1}.log-item{display:grid;grid-template-columns:auto auto 1fr;gap:6px;padding:5px 0;border-bottom:1px solid rgba(30,48,80,.5);align-items:flex-start;animation:slideIn .25s forwards}@keyframes slideIn{from{opacity:0;transform:translateX(4px)}to{opacity:1;transform:none}}.li-time{font-family:monospace;font-size:9px;color:var(--muted);margin-top:1px}.li-text{font-size:10px;color:#c0d8f0;line-height:1.35}.li-tag{font-size:9px;font-weight:900;padding:1px 5px;border-radius:3px}.li-tag.ai{background:rgba(26,184,232,.2);color:var(--blue)}.li-tag.warn{background:rgba(232,64,64,.2);color:var(--red)}.li-tag.ok{background:rgba(34,232,122,.15);color:var(--green)}
+.tip{position:fixed;z-index:300;background:#09162a;border:1px solid var(--blue);border-radius:10px;padding:9px 12px;font-size:11px;pointer-events:none;min-width:210px;box-shadow:0 4px 20px rgba(0,0,0,.6);display:none}.tip b{display:block;color:var(--blue);margin-bottom:5px;font-size:12px}.tip .tr{display:flex;justify-content:space-between;gap:10px;margin-top:3px;color:var(--muted)}.tip .tr span{color:var(--text);font-weight:800;text-align:right}.tip-green{border-color:var(--green)}.tip-green b{color:var(--green)}
+@media(max-width:1100px){body{overflow:auto}#app{grid-template-columns:1fr;height:auto}.map-col{height:620px}#side{height:620px}}
 </style>
 </head>
 <body>
-
-<!-- 헤더 -->
 <div id="header">
-  <h1>🏙 중앙 <span>AI</span> 도시 교통 통합 관제 시스템 — AI 전/후 비교</h1>
+  <h1>🏙 중앙 <span>AI</span> 도시 교통 통합 관제 시스템 — 현실 신호/횡단보도 비교</h1>
   <div class="hright">
     <div class="scen-btns">
-      <button class="sbtn active" id="btn-normal"    onclick="runScenario('normal')">기본 상태</button>
-      <button class="sbtn"        id="btn-accident"  onclick="runScenario('accident')">사고·공사</button>
-      <button class="sbtn"        id="btn-metro"     onclick="runScenario('metro')">지하철 도착</button>
-      <button class="sbtn"        id="btn-emergency" onclick="runScenario('emergency')">긴급차량</button>
+      <button class="sbtn active" id="btn-normal" onclick="runScenario('normal')">기본 상태</button>
+      <button class="sbtn" id="btn-accident" onclick="runScenario('accident')">사고·공사</button>
+      <button class="sbtn" id="btn-metro" onclick="runScenario('metro')">지하철 도착</button>
+      <button class="sbtn" id="btn-emergency" onclick="runScenario('emergency')">긴급차량</button>
     </div>
-    <div style="display:flex;align-items:center;gap:6px">
-      <div class="pulse-dot"></div>
-      <span class="live-label">LIVE</span>
-    </div>
+    <div style="display:flex;align-items:center;gap:6px"><div class="pulse-dot"></div><span class="live-label">LIVE</span></div>
   </div>
 </div>
-
-<!-- 메인 -->
 <div id="app">
-  <!-- 왼쪽: AI 미적용 -->
-  <div class="map-col" id="colNo">
-    <div class="map-area" id="mapNo"></div>
-    <div class="map-header">
-      <span class="map-label-no">⛔ AI 미적용 — 일반 신호 시스템</span>
-      <span class="map-congestion" id="congNo">혼잡도 —%</span>
-    </div>
-  </div>
-
-  <!-- 오른쪽: AI 적용 -->
-  <div class="map-col" id="colAi">
-    <div class="map-area" id="mapAi"></div>
-    <div class="map-header">
-      <span class="map-label-ai">✦ AI 적용 — 중앙 지능형 제어</span>
-      <span class="map-congestion" id="congAi">혼잡도 —%</span>
-    </div>
-  </div>
-
-  <!-- 우측 패널 -->
+  <div class="map-col"><div class="map-area" id="mapNo"></div><div class="map-header"><span class="map-label-no">⛔ AI 미적용 — 일반 신호 시스템</span><span class="map-congestion" id="congNo">혼잡도 —%</span></div></div>
+  <div class="map-col"><div class="map-area" id="mapAi"></div><div class="map-header"><span class="map-label-ai">✦ AI 적용 — 중앙 지능형 제어</span><span class="map-congestion" id="congAi">혼잡도 —%</span></div></div>
   <div id="side">
-    <!-- 효과 카드 -->
-    <div class="side-section">
-      <div class="sec-title">개선 효과</div>
-      <div class="effect-cards">
-        <div class="ec highlight" id="ec1"><div class="ev" id="ec1v">—</div><div class="el">대기시간<br>감소</div></div>
-        <div class="ec" id="ec2"><div class="ev" id="ec2v">—</div><div class="el">혼잡도<br>감소</div></div>
-        <div class="ec" id="ec3"><div class="ev" id="ec3v">—</div><div class="el">탄소배출<br>감소</div></div>
-        <div class="ec" id="ec4"><div class="ev" id="ec4v">—</div><div class="el" id="ec4l">공회전<br>감소</div></div>
-      </div>
-    </div>
-
-    <!-- 비교 수치 -->
-    <div class="side-section">
-      <div class="sec-title">수치 비교</div>
-      <div class="cmp-bar" id="cmpBar"></div>
-    </div>
-
-    <!-- AI 판단 흐름 -->
-    <div class="side-section">
-      <div class="sec-title">AI 판단 흐름</div>
-      <div class="flow-steps" id="flowSteps">
-        <div class="fs" id="fs1"><div class="fs-num">1</div><div class="fs-text"><b>입력 수집</b><span>도로·신호·대중교통·물류 통합</span></div></div>
-        <div class="fs" id="fs2"><div class="fs-num">2</div><div class="fs-text"><b>혼잡 예측</b><span>30초 후 혼잡 구간 예측</span></div></div>
-        <div class="fs" id="fs3"><div class="fs-num">3</div><div class="fs-text"><b>제어 실행</b><span>신호·우회·배차·긴급 조정</span></div></div>
-        <div class="fs" id="fs4"><div class="fs-num">4</div><div class="fs-text"><b>효과 추정</b><span>대기·공회전·탄소 감소 계산</span></div></div>
-      </div>
-    </div>
-
-    <!-- 공정성 -->
-    <div class="side-section">
-      <div class="sec-title">공정성 점수</div>
-      <div id="fairRows"></div>
-    </div>
-
-    <!-- AI 판단 로그 + 이벤트 -->
-    <div class="side-section" style="flex:1;min-height:0;display:flex;flex-direction:column">
-      <div class="sec-title">AI 판단 로그</div>
-      <div class="event-list" id="eventList" style="margin-bottom:8px;flex-shrink:0"></div>
-      <div class="log-scroll" id="logList"></div>
-    </div>
+    <div class="side-section"><div class="sec-title">개선 효과</div><div class="effect-cards">
+      <div class="ec highlight"><div class="ev" id="ec1v">—</div><div class="el">대기시간<br>감소</div></div>
+      <div class="ec"><div class="ev" id="ec2v">—</div><div class="el">혼잡도<br>감소</div></div>
+      <div class="ec"><div class="ev" id="ec3v">—</div><div class="el">탄소배출<br>감소</div></div>
+      <div class="ec"><div class="ev" id="ec4v">—</div><div class="el" id="ec4l">공회전<br>감소</div></div>
+    </div></div>
+    <div class="side-section"><div class="sec-title">수치 비교</div><div id="cmpBar"></div></div>
+    <div class="side-section"><div class="sec-title">AI 판단 흐름</div><div class="flow-steps">
+      <div class="fs" id="fs1"><div class="fs-num">1</div><div class="fs-text"><b>입력 수집</b><span>도로·신호·보행자·대중교통 통합</span></div></div>
+      <div class="fs" id="fs2"><div class="fs-num">2</div><div class="fs-text"><b>혼잡 예측</b><span>30초 후 혼잡·보행자 대기 예측</span></div></div>
+      <div class="fs" id="fs3"><div class="fs-num">3</div><div class="fs-text"><b>제어 실행</b><span>직진·좌회전 phase와 횡단보도 조정</span></div></div>
+      <div class="fs" id="fs4"><div class="fs-num">4</div><div class="fs-text"><b>효과 추정</b><span>대기·공회전·탄소 감소 계산</span></div></div>
+    </div></div>
+    <div class="side-section"><div class="sec-title">공정성 점수</div><div id="fairRows"></div></div>
+    <div class="side-section" style="flex:1;min-height:0;display:flex;flex-direction:column"><div class="sec-title">AI 판단 로그</div><div class="event-list" id="eventList" style="margin-bottom:8px;flex-shrink:0"></div><div class="log-scroll" id="logList"></div></div>
   </div>
 </div>
-
-<!-- 툴팁들 -->
-<div class="tip" id="vTip"></div>
-<div class="tip tip-green" id="sTip"></div>
-
+<div class="tip" id="vTip"></div><div class="tip tip-green" id="sTip"></div>
 <script>
-// ──────────────── 상수 ────────────────
-const TICK = 70;
-
-const NODES = {
-  A:{x:10,y:16}, B:{x:34,y:16}, C:{x:58,y:16}, D:{x:82,y:16},
-  E:{x:10,y:43}, F:{x:34,y:43}, G:{x:58,y:43}, H:{x:82,y:43},
-  I:{x:10,y:70}, J:{x:34,y:70}, K:{x:58,y:70}, L:{x:82,y:70}
-};
-
-const ROAD_DEFS = [
-  ['A','B'],['B','C'],['C','D'],
-  ['E','F'],['F','G'],['G','H'],
-  ['I','J'],['J','K'],['K','L'],
-  ['A','E'],['E','I'],
-  ['B','F'],['F','J'],
-  ['C','G'],['G','K'],
-  ['D','H'],['H','L'],
-  ['B','G'],['F','K']
+const TICK=70;
+const NODES={A:{x:10,y:16},B:{x:34,y:16},C:{x:58,y:16},D:{x:82,y:16},E:{x:10,y:43},F:{x:34,y:43},G:{x:58,y:43},H:{x:82,y:43},I:{x:10,y:70},J:{x:34,y:70},K:{x:58,y:70},L:{x:82,y:70}};
+const ROAD_DEFS=[['A','B'],['B','C'],['C','D'],['E','F'],['F','G'],['G','H'],['I','J'],['J','K'],['K','L'],['A','E'],['E','I'],['B','F'],['F','J'],['C','G'],['G','K'],['D','H'],['H','L'],['B','G'],['F','K']];
+const ROAD_META={'A-B':{name:'A↔B 간선로'},'B-C':{name:'B↔C 간선로'},'C-D':{name:'C↔D 간선로'},'E-F':{name:'E↔F 중심로'},'F-G':{name:'F↔G 혼잡구간'},'G-H':{name:'G↔H 동측로'},'I-J':{name:'I↔J 물류로'},'J-K':{name:'J↔K 역전로'},'K-L':{name:'K↔L 주거로'},'B-G':{name:'B↔G 대각선'},'F-K':{name:'F↔K 우회로'},'A-E':{name:'A↔E 북측로'},'E-I':{name:'E↔I 남북로'},'B-F':{name:'B↔F 중앙로'},'F-J':{name:'F↔J 중앙남'},'C-G':{name:'C↔G 중간로'},'G-K':{name:'G↔K 역세권'},'D-H':{name:'D↔H 동북로'},'H-L':{name:'H↔L 동남로'}};
+const SCEN_BASE={normal:42,accident:76,metro:54,emergency:62};
+const SCEN_ROAD_BOOST={normal:{'F-G':15,'B-C':8,'J-K':10},accident:{'F-G':40,'C-G':22,'B-C':20,'G-K':18,'G-H':14,'E-F':12,'J-K':10},metro:{'F-G':16,'G-K':23,'C-G':15,'G-H':17,'J-K':19},emergency:{'F-G':13,'F-J':11,'J-K':8}};
+const SCEN_AI_ROADS={normal:['B-C','F-J'],accident:['B-G','F-K','F-J'],metro:['C-G','G-K','G-H'],emergency:['A-B','B-C','C-D','D-H','H-L']};
+const SCEN_EMERG_ROADS={emergency:['A-B','B-C','C-D','D-H','H-L']};
+const CROSSWALKS=[{id:'CW1',road:'B-C',pos:.5},{id:'CW2',road:'F-G',pos:.48},{id:'CW3',road:'G-K',pos:.52},{id:'CW4',road:'J-K',pos:.45},{id:'CW5',road:'D-H',pos:.48}];
+const PHASES=[
+  {id:'EW_STRAIGHT',label:'동서 직진',dir:'EW',move:'straight'},
+  {id:'EW_LEFT',label:'동서 좌회전',dir:'EW',move:'left'},
+  {id:'NS_STRAIGHT',label:'남북 직진',dir:'NS',move:'straight'},
+  {id:'NS_LEFT',label:'남북 좌회전',dir:'NS',move:'left'},
+  {id:'ALL_YELLOW',label:'전체 황색',dir:'ALL',move:'yellow'}
 ];
+const COMPARE_DATA={normal:[['도시 혼잡도','51%','42%'],['평균 대기','47초','35초'],['탄소배출','기준','-5%']],accident:[['도시 혼잡도','90%','76%'],['평균 대기','98초','68초'],['공회전','기준','-22%']],metro:[['버스 대기','9분','4분'],['역 주변 혼잡','74%','54%'],['승객 처리','기준','+32%']],emergency:[['응급 도착','7분 40초','5분 20초'],['경로 신호','일반','녹색 고정'],['지연 차량','보통','F/J 대기']]};
+const EFFECT_DATA={normal:['25%','9%','5%','8%','공회전'],accident:['31%','14%','13%','22%','공회전'],metro:['55%','20%','10%','배차 단축','버스 배차'],emergency:['+2분 20초','18%','11%','긴급 도착','긴급 단축']};
+const FAIR_DATA={normal:[['도심',92],['역세권',88],['외곽',91]],accident:[['도심',78],['역세권',83],['외곽',87]],metro:[['도심',84],['역세권',96],['외곽',81]],emergency:[['도심',70],['역세권',85],['외곽',88]]};
+const LOG_DATA={normal:[['AI','B-C·F-G: 30초 후 혼잡 예측'],['AI','F-J: 직진 phase 선제 연장'],['OK','교차로 phase 기반 주행 정상'],['AI','횡단보도 대기시간 균형 조정'],['OK','도시 전체 모니터링 중']],accident:[['경고','F-G 사고 발생 감지'],['AI','F-G 회피 우회 경로 재계산'],['AI','B-G·F-K 직진 phase 연장'],['AI','횡단보도 보행 신호 간격 조정'],['OK','정체 분산 효과 추정']],metro:[['AI','지하철 도착 이벤트 감지'],['AI','G·K 버스 진행 phase 연장'],['AI','역 주변 횡단보도 보행 이벤트 반영'],['OK','버스 배차 9분→4분 단축'],['AI','택시 대기 구역 추천 완료']],emergency:[['경고','긴급차량 출동: A→L'],['AI','긴급 경로 phase 우선 허용'],['AI','횡단보도 일시 STOP 조정'],['OK','구급차 전 구간 신호 클리어'],['AI','통과 후 일반 제어 복귀 예정']]};
+const EVENT_DATA={normal:['📡 B-C 혼잡 상승 조짐','🚶 횡단보도 대기자 감지','🚌 버스 GPS: F 교차로 접근','🅿️ 주차 수요 낮음'],accident:['⚠️ F-G 차로 차단','🚛 물류 우회 경로 탐색','🚗 B-C 유입 증가','🚶 사고구간 보행신호 조정'],metro:['🚇 지하철 도착','🚌 G-K 버스 수요 급증','🚕 택시 호출 증가','🚶 역 주변 보행자 급증'],emergency:['🚨 긴급차량 출동','🏥 목적지 L 응급 거점','🚦 긴급 경로 우선 phase','🚶 횡단보도 일시 정지']};
+function rKey(a,b){return [a,b].sort().join('-')} function clamp(v,min,max){return Math.max(min,Math.min(max,v))}
+function roadDir(a,b){const n1=NODES[a],n2=NODES[b];return Math.abs(n2.x-n1.x)>=Math.abs(n2.y-n1.y)?'EW':'NS'}
+function vec(a,b){return {x:Math.sign(NODES[b].x-NODES[a].x),y:Math.sign(NODES[b].y-NODES[a].y)}}
+function moveType(prev,cur,next){if(!prev||!next)return 'straight';const v1=vec(prev,cur),v2=vec(cur,next);const cross=v1.x*v2.y-v1.y*v2.x;const dot=v1.x*v2.x+v1.y*v2.y;if(dot>0)return 'straight';if(cross===0)return 'straight';return cross>0?'left':'right'}
+function keyForSeg(path,seg){return rKey(path[seg],path[(seg+1)%path.length])}
 
-const ROAD_META = {
-  'A-B':{name:'A↔B 간선로'},'B-C':{name:'B↔C 간선로'},'C-D':{name:'C↔D 간선로'},
-  'E-F':{name:'E↔F 중심로'},'F-G':{name:'F↔G 혼잡구간'},'G-H':{name:'G↔H 동측로'},
-  'I-J':{name:'I↔J 물류로'},'J-K':{name:'J↔K 역전로'},'K-L':{name:'K↔L 주거로'},
-  'B-G':{name:'B↔G 대각선'},'F-K':{name:'F↔K 우회로'},
-  'A-E':{name:'A↔E 북측로'},'E-I':{name:'E↔I 남북로'},'B-F':{name:'B↔F 중앙로'},
-  'F-J':{name:'F↔J 중앙남'},'C-G':{name:'C↔G 중간로'},'G-K':{name:'G↔K 역세권'},'D-H':{name:'D↔H 동북로'},'H-L':{name:'H↔L 동남로'},
-};
-
-function rKey(a,b){ return [a,b].sort().join('-'); }
-
-const SCEN_BASE={normal:40,accident:74,metro:52,emergency:60};
-
-const SCEN_ROAD_BOOST={
-  normal:{'F-G':14,'B-C':8,'J-K':10},
-  accident:{'F-G':38,'C-G':20,'B-C':18,'G-K':16,'G-H':14,'E-F':10,'J-K':10},
-  metro:{'F-G':16,'G-K':22,'C-G':14,'G-H':16,'J-K':18},
-  emergency:{'F-G':12,'F-J':10,'J-K':8}
-};
-
-const SCEN_AI_ROADS={
-  normal:['B-C','F-J'],
-  accident:['B-G','F-K','F-J'],
-  metro:['C-G','G-K','G-H'],
-  emergency:['A-B','B-C','C-D','D-H','H-L']
-};
-
-const SCEN_EMERG_ROADS={
-  emergency:['A-B','B-C','C-D','D-H','H-L']
-};
-
-const COMPARE_DATA={
-  normal:[['도시 혼잡도','49%','40%'],['평균 대기','42초','35초'],['탄소배출','기준','-4%']],
-  accident:[['도시 혼잡도','88%','74%'],['평균 대기','95초','68초'],['공회전','기준','-21%']],
-  metro:[['버스 대기','9분','4분'],['역 주변 혼잡','72%','52%'],['승객 처리','기준','+32%']],
-  emergency:[['응급 도착','7분 40초','5분 20초'],['경로 신호','일반','녹색 고정'],['지연 차량','보통','F/J 대기']]
-};
-
-const EFFECT_DATA={
-  normal:  ['23%','9%','5%','7%','공회전 감소'],
-  accident:['28%','14%','13%','21%','공회전 감소'],
-  metro:   ['52%','18%','10%','배차 단축','버스 배차'],
-  emergency:['+2분 2초','18%','11%','긴급 도착','긴급 단축']
-};
-
-const FAIR_DATA={
-  normal:[['도심',92],['역세권',88],['외곽',91]],
-  accident:[['도심',78],['역세권',83],['외곽',87]],
-  metro:[['도심',84],['역세권',96],['외곽',81]],
-  emergency:[['도심',70],['역세권',85],['외곽',88]]
-};
-
-const FLOW_STEPS_DATA={
-  normal:[1],
-  accident:[1,2,3,4],
-  metro:[1,2,3,4],
-  emergency:[1,2,3,4]
-};
-
-const LOG_DATA={
-  normal:[
-    ['AI','B-C·F-G: 30초 후 혼잡 예측 구간 지정'],
-    ['AI','F-J: 신호 시간 선제 조정'],
-    ['OK','일반 차량 신호 반응 정상'],
-    ['AI','공정성 점수 기반 제어 계산'],
-    ['OK','도시 전체 모니터링 중'],
-  ],
-  accident:[
-    ['경고','F-G 사고 발생 감지'],
-    ['AI','목적지 기반 경로 재계산: F-G 회피'],
-    ['AI','B-G·F-K 우회 경로 활성화'],
-    ['AI','F·J 교차로 우회 신호 전환'],
-    ['OK','공회전·대기시간 감소 효과 추정'],
-  ],
-  metro:[
-    ['AI','지하철 도착 이벤트 감지'],
-    ['AI','G·K: 버스 우선 초록 신호 연장'],
-    ['AI','C-G·G-H: 대중교통 우선 제어'],
-    ['OK','버스 배차 9분→4분 단축'],
-    ['AI','택시 대기 구역 추천 완료'],
-  ],
-  emergency:[
-    ['경고','긴급차량 출동: A→L 경로'],
-    ['AI','A·B·C·D·H 신호 녹색 고정'],
-    ['AI','F·J 교차로: 일반 차량 대기 유도'],
-    ['OK','구급차 전 구간 신호 클리어'],
-    ['AI','통과 후 일반 제어 복귀 예정'],
-  ]
-};
-
-const EVENT_DATA={
-  normal:['📡 B-C 혼잡 상승 조짐 감지','🚌 버스 GPS: F 교차로 접근','🚕 택시 수요: 도심 보통','🅿️ 주차 수요: 외곽 낮음'],
-  accident:['⚠️ 사고 감지: F-G 차로 차단','🚛 물류 우회 경로 탐색','🚗 B-C 유입 차량 증가','🧭 AI: F-K 우회 계산 완료'],
-  metro:['🚇 지하철 도착: 역세권 승객 급증','🚌 버스 수요: G-K 급증','🚕 택시 호출 증가','🚶 보행자: G 교차로 급증'],
-  emergency:['🚨 긴급차량 출동: A 지점','🏥 목적지: L 응급 거점','🚦 신호 제어: B-C-D-H 녹색','🚗 일반 차량 F·J 대기 유도']
-};
-
-// ──────────────── 맵 인스턴스 ────────────────
-class TrafficMap {
-  constructor(containerId, isAI){
-    this.container = document.getElementById(containerId);
-    this.isAI = isAI;
-    this.roadEls = {};
-    this.roadTraffic = {};
-    this.signals = {};
-    this.sigEls = {};
-    this.vehicles = [];
-    this.dynEls = [];
-    this.curScen = 'normal';
-    this._buildBaseRoads();
-    this._buildZones();
+class TrafficMap{
+  constructor(containerId,isAI){
+    this.container=document.getElementById(containerId);this.isAI=isAI;
+    this.roadEls={};this.roadTraffic={};this.signals={};this.sigEls={};this.phaseTags={};this.crosswalks={};this.vehicles=[];this.dynEls=[];this.curScen='normal';
+    this._buildBaseRoads();this._buildZones();
   }
-
-  _pct(v){ return v + '%'; }
-
-  _buildZones(){
-    const zones = [
-      {txt:'도심 업무지구', x:7, y:7},
-      {txt:'지하철역', x:42, y:56},
-      {txt:'주거·물류', x:72, y:85}
-    ];
-    zones.forEach(z=>{
-      const el = document.createElement('div');
-      el.className='zone-lbl'; el.textContent=z.txt;
-      el.style.left=z.x+'%'; el.style.top=z.y+'%';
-      this.container.appendChild(el);
-    });
-  }
-
+  _buildZones(){[{txt:'도심 업무지구',x:7,y:7},{txt:'지하철역',x:42,y:56},{txt:'주거·물류',x:72,y:85}].forEach(z=>{const el=document.createElement('div');el.className='zone-lbl';el.textContent=z.txt;el.style.left=z.x+'%';el.style.top=z.y+'%';this.container.appendChild(el)})}
   _buildBaseRoads(){
-    ROAD_DEFS.forEach(([a,b])=>{
-      const n1=NODES[a],n2=NODES[b];
-      const dx=n2.x-n1.x,dy=n2.y-n1.y;
-      const len=Math.hypot(dx,dy),ang=Math.atan2(dy,dx)*180/Math.PI;
-      const r=document.createElement('div');
-      r.className='road'; r.dataset.k=rKey(a,b);
-      r.style.cssText=`left:${n1.x}%;top:${n1.y}%;width:${len}%;transform:rotate(${ang}deg)`;
-      r.addEventListener('mouseenter',e=>this._showRoadTip(e,r));
-      r.addEventListener('mousemove',e=>{
-        const t=document.getElementById('vTip');
-        t.style.left=(e.clientX+12)+'px';t.style.top=(e.clientY-50)+'px';
-      });
-      r.addEventListener('mouseleave',()=>{ document.getElementById('vTip').style.display='none'; });
-      this.container.appendChild(r);
-      this.roadEls[rKey(a,b)]=r;
-    });
-    Object.keys(NODES).forEach(id=>{
-      const n=NODES[id];
-      const el=document.createElement('div'); el.className='node';
-      el.style.left=n.x+'%'; el.style.top=n.y+'%';
-      this.container.appendChild(el);
-    });
+    ROAD_DEFS.forEach(([a,b])=>{const n1=NODES[a],n2=NODES[b],dx=n2.x-n1.x,dy=n2.y-n1.y,len=Math.hypot(dx,dy),ang=Math.atan2(dy,dx)*180/Math.PI;const r=document.createElement('div');r.className='road';r.dataset.k=rKey(a,b);r.style.cssText=`left:${n1.x}%;top:${n1.y}%;width:${len}%;transform:rotate(${ang}deg)`;r.addEventListener('mouseenter',e=>this._showRoadTip(e,r));r.addEventListener('mousemove',e=>{const t=document.getElementById('vTip');t.style.left=(e.clientX+12)+'px';t.style.top=(e.clientY-50)+'px'});r.addEventListener('mouseleave',()=>document.getElementById('vTip').style.display='none');this.container.appendChild(r);this.roadEls[rKey(a,b)]=r});
+    Object.keys(NODES).forEach(id=>{const n=NODES[id],el=document.createElement('div');el.className='node';el.style.left=n.x+'%';el.style.top=n.y+'%';this.container.appendChild(el)})
   }
-
-  _showRoadTip(e,r){
-    const t=document.getElementById('vTip');
-    const k=r.dataset.k; const m=ROAD_META[k]||{name:k};
-    const rt=this.roadTraffic[k]||{now:0,pastAvg:0,neighAvg:0};
-    const st = r.classList.contains('congested')?'혼잡'
-             : r.classList.contains('predicted')?'혼잡예측'
-             : r.classList.contains('ai-ctrl')?'AI제어'
-             : r.classList.contains('emergency')?'긴급':'정상';
-    t.innerHTML=`<b>${m.name}</b>
-      <div class="tr">현재 혼잡도<span>${rt.now}%</span></div>
-      <div class="tr">상태<span>${st}</span></div>
-      <div class="tr">AI 판단<span>${this.isAI?(rt.now>=70?'신호연장·우회':'정상유지'):'일반 신호'}</span></div>`;
-    t.style.display='block';
-    t.style.left=(e.clientX+12)+'px'; t.style.top=(e.clientY-50)+'px';
-  }
-
-  initTraffic(scen){
-    this.curScen=scen;
-    const base=SCEN_BASE[scen]||40;
-    ROAD_DEFS.forEach(([a,b],idx)=>{
-      const k=rKey(a,b);
-      const boost=(SCEN_ROAD_BOOST[scen]&&SCEN_ROAD_BOOST[scen][k])||0;
-      // AI 적용 시 혼잡 boost 감소
-      const aiReduction = this.isAI ? (boost>0 ? boost*0.45 : 0) : 0;
-      const seed=clamp(base+boost-aiReduction+((idx%5)-2)*3, 10, 96);
-      this.roadTraffic[k]={now:seed,hist:[seed-4,seed-2,seed],pastAvg:seed,neighAvg:seed};
-    });
-    this._applyRoadClasses(scen);
-  }
-
-  _applyRoadClasses(scen){
-    // 기본 클래스 초기화
-    Object.values(this.roadEls).forEach(r=>{
-      r.className='road';
-    });
-    // 시나리오별 도로 상태
-    const boosts=SCEN_ROAD_BOOST[scen]||{};
-    const aiRoads=SCEN_AI_ROADS[scen]||[];
-    const emRoads=SCEN_EMERG_ROADS[scen]||[];
-
-    Object.keys(this.roadTraffic).forEach(k=>{
-      const r=this.roadEls[k]; if(!r) return;
-      const v=this.roadTraffic[k].now;
-      if(emRoads.includes(k)&&this.isAI){ r.classList.add('emergency'); return; }
-      if(aiRoads.includes(k)&&this.isAI){ r.classList.add('ai-ctrl'); return; }
-      if(v>=70) r.classList.add('congested');
-      else if(v>=52) r.classList.add('predicted');
-    });
-
-    // 우회로 표시 (사고 시나리오, AI만)
-    if(scen==='accident'&&this.isAI){
-      ['E-I','I-J','J-K','F-K'].forEach(k=>{ if(this.roadEls[k]) this.roadEls[k].classList.add('detour'); });
-    }
-  }
-
-  updateTraffic(){
-    const scen=this.curScen;
-    const base=SCEN_BASE[scen]||40;
-    Object.keys(this.roadTraffic).forEach(k=>{
-      const rt=this.roadTraffic[k];
-      const boost=(SCEN_ROAD_BOOST[scen]&&SCEN_ROAD_BOOST[scen][k])||0;
-      const aiReduction=this.isAI?(boost>0?boost*0.45:0):0;
-      const past=rt.hist.reduce((a,b)=>a+b,0)/rt.hist.length;
-      const noise=(Math.random()-.5)*5;
-      const target=clamp(base+boost-aiReduction,8,96);
-      const next=clamp(rt.now*0.4+past*0.3+target*0.3+noise,8,98);
-      rt.now=Math.round(next); rt.pastAvg=Math.round(past);
-      rt.hist.push(rt.now); if(rt.hist.length>10) rt.hist.shift();
-    });
-    this._applyRoadClasses(scen);
-  }
-
-  avgCongestion(){
-    const vals=Object.values(this.roadTraffic).map(x=>x.now);
-    return vals.length?Math.round(vals.reduce((a,b)=>a+b,0)/vals.length):(SCEN_BASE[this.curScen]||40);
-  }
-
-  // ── 신호등 ──
-  createSig(nodeId, greenFirst, managed, redTicks, greenTicks){
-    const n=NODES[nodeId];
-    const wrap=document.createElement('div'); wrap.className='sig-wrap';
-    wrap.style.left=(n.x+1.8)+'%'; wrap.style.top=(n.y-6)+'%';
-    const box=document.createElement('div'); box.className='sig-box';
-    box.innerHTML='<div class="lite r"></div><div class="lite y"></div><div class="lite g"></div>';
-    if(managed&&this.isAI){
-      const badge=document.createElement('div'); badge.className='sig-ai-badge';
-      box.appendChild(badge);
-    }
-    const lbl=document.createElement('div'); lbl.className='sig-lbl';
-    lbl.textContent=nodeId+(managed&&this.isAI?' ★':'');
-    wrap.appendChild(box); wrap.appendChild(lbl);
-    this.container.appendChild(wrap); this.dynEls.push(wrap);
-    this.sigEls[nodeId]=box;
-    this.signals[nodeId]={
-      state:greenFirst?'green':'red',timer:0,
-      redDur:redTicks||28,yellowDur:5,greenDur:greenTicks||28,
-      managed,locked:false
-    };
-    wrap.addEventListener('mouseenter',()=>this._showSigTip(nodeId));
-    wrap.addEventListener('mousemove',e=>{
-      const t=document.getElementById('sTip');
-      t.style.left=(e.clientX+12)+'px';t.style.top=(e.clientY-70)+'px';
-    });
-    wrap.addEventListener('mouseleave',()=>{ document.getElementById('sTip').style.display='none'; });
+  _showRoadTip(e,r){const t=document.getElementById('vTip'),k=r.dataset.k,m=ROAD_META[k]||{name:k},rt=this.roadTraffic[k]||{now:0};const st=r.classList.contains('congested')?'혼잡':r.classList.contains('predicted')?'혼잡예측':r.classList.contains('ai-ctrl')?'AI제어':r.classList.contains('emergency')?'긴급':'정상';t.innerHTML=`<b>${m.name}</b><div class="tr">현재 혼잡도<span>${rt.now}%</span></div><div class="tr">상태<span>${st}</span></div><div class="tr">차량 제어<span>${this.isAI?'phase+횡단보도 AI 조정':'고정 phase'}</span></div>`;t.style.display='block';t.style.left=(e.clientX+12)+'px';t.style.top=(e.clientY-50)+'px'}
+  initTraffic(scen){this.curScen=scen;const base=SCEN_BASE[scen]||42;ROAD_DEFS.forEach(([a,b],idx)=>{const k=rKey(a,b),boost=(SCEN_ROAD_BOOST[scen]&&SCEN_ROAD_BOOST[scen][k])||0,aiReduction=this.isAI?(boost>0?boost*.45:0):0,seed=clamp(base+boost-aiReduction+((idx%5)-2)*3,10,96);this.roadTraffic[k]={now:Math.round(seed),hist:[seed-4,seed-2,seed],pastAvg:seed}});this._applyRoadClasses(scen)}
+  _applyRoadClasses(scen){Object.values(this.roadEls).forEach(r=>r.className='road');const aiRoads=SCEN_AI_ROADS[scen]||[],emRoads=SCEN_EMERG_ROADS[scen]||[];Object.keys(this.roadTraffic).forEach(k=>{const r=this.roadEls[k];if(!r)return;const v=this.roadTraffic[k].now;if(emRoads.includes(k)&&this.isAI){r.classList.add('emergency');return}if(aiRoads.includes(k)&&this.isAI){r.classList.add('ai-ctrl');return}if(v>=70)r.classList.add('congested');else if(v>=52)r.classList.add('predicted')});if(scen==='accident'&&this.isAI)['E-I','I-J','J-K','F-K'].forEach(k=>this.roadEls[k]?.classList.add('detour'))}
+  updateTraffic(){const scen=this.curScen,base=SCEN_BASE[scen]||42;Object.keys(this.roadTraffic).forEach(k=>{const rt=this.roadTraffic[k],boost=(SCEN_ROAD_BOOST[scen]&&SCEN_ROAD_BOOST[scen][k])||0,aiReduction=this.isAI?(boost>0?boost*.45:0):0,past=rt.hist.reduce((a,b)=>a+b,0)/rt.hist.length,noise=(Math.random()-.5)*5,target=clamp(base+boost-aiReduction,8,96),next=clamp(rt.now*.4+past*.3+target*.3+noise,8,98);rt.now=Math.round(next);rt.pastAvg=Math.round(past);rt.hist.push(rt.now);if(rt.hist.length>10)rt.hist.shift()});this._applyRoadClasses(scen)}
+  avgCongestion(){const vals=Object.values(this.roadTraffic).map(x=>x.now);return vals.length?Math.round(vals.reduce((a,b)=>a+b,0)/vals.length):42}
+  createSig(nodeId,managed=false,profile={}){
+    const n=NODES[nodeId],wrap=document.createElement('div');wrap.className='sig-wrap';wrap.style.left=(n.x+1.8)+'%';wrap.style.top=(n.y-6.4)+'%';
+    const box=document.createElement('div');box.className='sig-box';box.innerHTML='<div class="lite r"></div><div class="lite y"></div><div class="lite g"></div>';
+    if(managed&&this.isAI){const badge=document.createElement('div');badge.className='sig-ai-badge';box.appendChild(badge)}
+    const lbl=document.createElement('div');lbl.className='sig-lbl';lbl.textContent=nodeId+(managed&&this.isAI?' ★':'');
+    wrap.appendChild(box);wrap.appendChild(lbl);this.container.appendChild(wrap);this.dynEls.push(wrap);this.sigEls[nodeId]=box;
+    const tag=document.createElement('div');tag.className='phase-tag';tag.style.left=(n.x+6)+'%';tag.style.top=(n.y+4)+'%';this.container.appendChild(tag);this.dynEls.push(tag);this.phaseTags[nodeId]=tag;
+    this.signals[nodeId]={nodeId,phaseIdx:profile.startIdx||0,timer:0,managed,lockedPhase:profile.lockedPhase||null,durations:this._phaseDurations(profile),emergency:!!profile.emergency};
+    wrap.addEventListener('mouseenter',()=>this._showSigTip(nodeId));wrap.addEventListener('mousemove',e=>{const t=document.getElementById('sTip');t.style.left=(e.clientX+12)+'px';t.style.top=(e.clientY-86)+'px'});wrap.addEventListener('mouseleave',()=>document.getElementById('sTip').style.display='none');
     this._applySigDOM(nodeId);
   }
+  _phaseDurations(profile={}){let d=[64,24,64,24,10];if(this.isAI){if(this.curScen==='accident')d=[82,24,58,22,9];if(this.curScen==='metro')d=[58,22,88,22,9];if(this.curScen==='emergency')d=[96,18,96,18,8];if(profile.boost==='EW')d[0]+=26;if(profile.boost==='NS')d[2]+=26}return d}
+  currentPhase(nodeId){const s=this.signals[nodeId];if(!s)return null;if(s.lockedPhase)return PHASES.find(p=>p.id===s.lockedPhase);return PHASES[s.phaseIdx]}
+  tickSignals(){for(const id in this.signals){const s=this.signals[id];if(s.lockedPhase){this._applySigDOM(id);continue}s.timer++;const dur=s.durations[s.phaseIdx]||20;if(s.timer>=dur){s.timer=0;s.phaseIdx=(s.phaseIdx+1)%PHASES.length;this._applySigDOM(id)}}Object.values(this.crosswalks).forEach(cw=>this._applyCrosswalkDOM(cw))}
+  _applySigDOM(id){const box=this.sigEls[id],s=this.signals[id];if(!box||!s)return;const ph=this.currentPhase(id);const yellow=ph.id==='ALL_YELLOW';box.querySelector('.lite.r').classList.toggle('on',!yellow&&false);box.querySelector('.lite.y').classList.toggle('on',yellow);box.querySelector('.lite.g').classList.toggle('on',!yellow);if(this.phaseTags[id])this.phaseTags[id].textContent=ph.label.replace('동서','EW').replace('남북','NS')}
+  isAllowedAtNode(prev,cur,next,veh){if(veh.isEms&&this.isAI)return true;const s=this.signals[cur];if(!s)return true;const ph=this.currentPhase(cur);if(!ph||ph.id==='ALL_YELLOW')return false;const dir=roadDir(prev,cur);const mv=moveType(prev,cur,next);if(mv==='right'){const road=rKey(prev,cur);return !this.isPedWalkOnRoad(road)}return ph.dir===dir&&ph.move===mv}
+  _showSigTip(nodeId){const s=this.signals[nodeId];if(!s)return;const ph=this.currentPhase(nodeId),remain=s.lockedPhase?'고정':Math.max(0,(s.durations[s.phaseIdx]||20)-s.timer)+' tick';const t=document.getElementById('sTip');t.innerHTML=`<b>${nodeId} 교차로 phase 신호</b><div class="tr">현재 phase<span>${ph.label}</span></div><div class="tr">허용 방향<span>${ph.dir==='EW'?'동서':ph.dir==='NS'?'남북':'전환 대기'}</span></div><div class="tr">좌회전 허용<span>${ph.move==='left'?'허용':'불가'}</span></div><div class="tr">제어 방식<span>${s.managed&&this.isAI?'AI phase 조정':'고정 주기'}</span></div><div class="tr">남은 시간<span>${remain}</span></div>`;t.style.display='block'}
+  createCrosswalk(id,roadKey,pos=.5,aiManaged=false){
+    const road=this.roadEls[roadKey];
+    if(!road) return;
 
-  _applySigDOM(id){
-    const box=this.sigEls[id]; if(!box) return;
-    const st=this.signals[id].state;
-    box.querySelector('.lite.r').classList.toggle('on',st==='red');
-    box.querySelector('.lite.y').classList.toggle('on',st==='yellow');
-    box.querySelector('.lite.g').classList.toggle('on',st==='green');
+    // 중요: 횡단보도를 지도 좌표에 따로 얹지 않고, 해당 도로 요소 내부에 붙인다.
+    // 이렇게 해야 도로가 rotate 되어도 횡단보도가 도로와 같은 각도로 정확히 겹친다.
+    const cw=document.createElement('div');
+    cw.className='crosswalk-on-road';
+    cw.style.left=(pos*100)+'%';
+
+    const ps=document.createElement('div');
+    ps.className='ped-sig';
+    ps.textContent='STOP';
+    ps.style.left=(pos*100)+'%';
+
+    road.appendChild(cw);
+    road.appendChild(ps);
+    this.dynEls.push(cw,ps);
+
+    const parts=roadKey.split('-');
+    const obj={id,roadKey,a:parts[0],b:parts[1],pos,el:cw,sigEl:ps,timer:Math.floor(Math.random()*10),walk:false,aiManaged};
+    this.crosswalks[id]=obj;
+
+    cw.addEventListener('mouseenter',e=>this._showPedTip(e,obj));
+    cw.addEventListener('mousemove',e=>{const t=document.getElementById('vTip');t.style.left=(e.clientX+12)+'px';t.style.top=(e.clientY-50)+'px'});
+    cw.addEventListener('mouseleave',()=>document.getElementById('vTip').style.display='none');
+    ps.addEventListener('mouseenter',e=>this._showPedTip(e,obj));
+    ps.addEventListener('mousemove',e=>{const t=document.getElementById('vTip');t.style.left=(e.clientX+12)+'px';t.style.top=(e.clientY-50)+'px'});
+    ps.addEventListener('mouseleave',()=>document.getElementById('vTip').style.display='none');
   }
-
-  lockSig(nodeId,state){
-    if(!this.signals[nodeId]) return;
-    this.signals[nodeId].locked=true; this.signals[nodeId].state=state;
-    this._applySigDOM(nodeId);
-  }
-
-  tickSignals(){
-    for(const id in this.signals){
-      const s=this.signals[id];
-      if(s.locked) continue;
-      s.timer++;
-      const dur=s.state==='red'?s.redDur:s.state==='green'?s.greenDur:s.yellowDur;
-      if(s.timer>=dur){
-        s.timer=0;
-        s.state=s.state==='green'?'yellow':s.state==='yellow'?'red':'green';
-        this._applySigDOM(id);
-      }
-    }
-  }
-
-  _showSigTip(nodeId){
-    const s=this.signals[nodeId]; if(!s) return;
-    const t=document.getElementById('sTip');
-    const st=s.state==='green'?'🟢 초록':s.state==='yellow'?'🟡 노랑':'🔴 빨강';
-    const ctrl=s.locked?'긴급 고정':s.managed&&this.isAI?'AI 관리':'일반 주기';
-    t.innerHTML=`<b>${nodeId} 교차로 신호</b>
-      <div class="tr">현재 상태<span>${st}</span></div>
-      <div class="tr">제어 방식<span>${ctrl}</span></div>
-      <div class="tr">남은 시간<span>${s.locked?'고정':Math.max(0,(s.state==='red'?s.redDur:s.state==='green'?s.greenDur:s.yellowDur)-s.timer)+' tick'}</span></div>`;
-    t.style.display='block';
-  }
-
-  // ── 차량 ──
-  addVeh(emoji, path, speed, isEms=false, meta={}){
-    const start=NODES[path[0]];
-    const el=document.createElement('div'); el.className='veh';
-    el.textContent=emoji;
-    el.style.fontSize=isEms?'16px':'12px';
-    el.style.left=start.x+'%'; el.style.top=start.y+'%';
-    this.container.appendChild(el); this.dynEls.push(el);
-
-    el.addEventListener('mouseenter',()=>{
-      const v=this.vehicles.find(x=>x.el===el);
-      const t=document.getElementById('sTip');
-      const st=v?.stopped?'🔴 정지':v?.braking?'🟡 감속':'🟢 주행';
-      t.innerHTML=`<b>${meta.type||'차량'}</b>
-        <div class="tr">상태<span>${st}</span></div>
-        <div class="tr">기본 속도<span>${meta.speed||'-'}</span></div>
-        <div class="tr">AI 지시<span>${this.isAI?(meta.aiCmd||'정상'):'일반 운행'}</span></div>`;
-      t.style.display='block';
-    });
-    el.addEventListener('mousemove',e=>{
-      const t=document.getElementById('sTip');
-      t.style.left=(e.clientX+12)+'px';t.style.top=(e.clientY-60)+'px';
-    });
-    el.addEventListener('mouseleave',()=>{ document.getElementById('sTip').style.display='none'; });
-
-    const segLen=path.length-1;
-    this.vehicles.push({
-      el, path, baseSpeed:speed, speed,
-      seg:0, t:Math.random()*0.7,
-      stopped:false, braking:false, isEms, meta,
-      segLen
-    });
-  }
-
-  tickVehicles(){
-    const STOP=0.10, BRAKE=0.35;
-    this.vehicles.forEach(v=>{
-      if(v.path.length<2) return;
-      const nextNode=v.path[(v.seg+1)%v.path.length];
-      const distLeft=1-v.t;
-      if(!v.isEms){
-        const st=this.signals[nextNode]?.state;
-        if(st==='red'||st==='yellow'){
-          if(distLeft<=STOP){
-            v.stopped=true; v.braking=false;
-            v.el.classList.add('stopped'); v.el.classList.remove('braking');
-            return;
-          } else if(distLeft<=BRAKE){
-            v.stopped=false; v.braking=true;
-            const ratio=(distLeft-STOP)/(BRAKE-STOP);
-            v.speed=v.baseSpeed*(0.08+ratio*0.4);
-            v.el.classList.remove('stopped'); v.el.classList.add('braking');
-          } else {
-            v.braking=false; v.speed=v.baseSpeed;
-            v.el.classList.remove('stopped','braking');
-          }
-        } else {
-          v.stopped=false; v.braking=false; v.speed=v.baseSpeed;
-          v.el.classList.remove('stopped','braking');
-        }
-      }
-      if(v.stopped) return;
-      v.t+=v.speed;
-      if(v.t>=1){ v.t-=1; v.seg=(v.seg+1)%v.segLen; }
-      const a=NODES[v.path[v.seg]]; const b=NODES[v.path[(v.seg+1)%v.path.length]];
-      if(!a||!b) return;
-      const px=a.x+(b.x-a.x)*v.t; const py=a.y+(b.y-a.y)*v.t;
-      v.el.style.left=px+'%'; v.el.style.top=py+'%';
-      v.el.style.transform='translate(-50%,-50%)';
-    });
-  }
-
-  addMkr(txt,x,y,type){
-    const m=document.createElement('div'); m.className='mkr '+type;
-    m.textContent=txt; m.style.left=x+'%'; m.style.top=y+'%';
-    this.container.appendChild(m); this.dynEls.push(m);
-  }
-
-  addEffectBadge(txt,x,y){
-    const m=document.createElement('div'); m.className='effect-badge';
-    m.textContent=txt; m.style.left=x+'%'; m.style.top=y+'%';
-    this.container.appendChild(m); this.dynEls.push(m);
-  }
-
-  clear(){
-    this.dynEls.forEach(e=>e.remove()); this.dynEls=[];
-    this.vehicles=[]; this.signals={}; this.sigEls={};
-    Object.values(this.roadEls).forEach(r=>r.className='road');
-  }
+  _applyCrosswalkDOM(cw){cw.timer++;let cycle=this.isAI?150:130,walkStart=this.isAI?110:90,walkLen=this.isAI?22:24;if(this.isAI&&this.curScen==='metro'&&['G-K','J-K'].includes(cw.roadKey)){walkStart=74;walkLen=32}if(this.isAI&&this.curScen==='emergency'&&['B-C','D-H'].includes(cw.roadKey)){walkStart=200;walkLen=0}cw.walk=(cw.timer%cycle)>=walkStart&&(cw.timer%cycle)<walkStart+walkLen;cw.sigEl.textContent=cw.walk?'WALK':'STOP';cw.sigEl.classList.toggle('walk',cw.walk)}
+  _showPedTip(e,cw){const t=document.getElementById('vTip');t.innerHTML=`<b>${cw.id} 횡단보도</b><div class="tr">보행자 신호<span>${cw.walk?'🟢 WALK':'🔴 STOP'}</span></div><div class="tr">차량 정지<span>${cw.walk?'정지':'통과'}</span></div><div class="tr">연결 도로<span>${cw.roadKey}</span></div><div class="tr">AI 조정<span>${this.isAI&&cw.aiManaged?'적용':'미적용'}</span></div>`;t.style.display='block';t.style.left=(e.clientX+12)+'px';t.style.top=(e.clientY-50)+'px'}
+  isPedWalkOnRoad(roadKey){return Object.values(this.crosswalks).some(cw=>cw.roadKey===roadKey&&cw.walk)}
+  crosswalkStopAhead(v){const road=keyForSeg(v.path,v.seg);for(const cw of Object.values(this.crosswalks)){if(cw.roadKey===road&&cw.walk){const cur=v.path[v.seg],nxt=v.path[(v.seg+1)%v.path.length];const forward=(cur===cw.a&&nxt===cw.b);const reverse=(cur===cw.b&&nxt===cw.a);if(!forward&&!reverse)continue;const stopPos=(forward?cw.pos:1-cw.pos)-.075;if(v.t<stopPos&&stopPos-v.t<.30)return stopPos;if(Math.abs(v.t-stopPos)<.035)return stopPos}}return null}
+  addVeh(emoji,path,speed,isEms=false,meta={},offset=null){const start=NODES[path[0]],el=document.createElement('div');el.className='veh';el.textContent=emoji;el.style.fontSize=isEms?'21px':'18px';el.style.left=start.x+'%';el.style.top=start.y+'%';this.container.appendChild(el);this.dynEls.push(el);el.addEventListener('mouseenter',()=>{const v=this.vehicles.find(x=>x.el===el),t=document.getElementById('sTip'),st=v?.stopped?'🔴 정지':v?.braking?'🟡 감속':'🟢 주행';t.innerHTML=`<b>${meta.type||'차량'}</b><div class="tr">상태<span>${st}</span></div><div class="tr">이동 판단<span>${v?.moveLabel||'직진/좌회전 phase 확인'}</span></div><div class="tr">기본 속도<span>${meta.speed||'-'}</span></div><div class="tr">AI 지시<span>${this.isAI?(meta.aiCmd||'정상'):'일반 운행'}</span></div>`;t.style.display='block'});el.addEventListener('mousemove',e=>{const t=document.getElementById('sTip');t.style.left=(e.clientX+12)+'px';t.style.top=(e.clientY-64)+'px'});el.addEventListener('mouseleave',()=>document.getElementById('sTip').style.display='none');this.vehicles.push({el,path,baseSpeed:speed,speed,seg:0,t:offset??Math.random()*.75,stopped:false,braking:false,isEms,meta,segLen:path.length-1,moveLabel:'-'})}
+  tickVehicles(){const STOP=.095,BRAKE=.34,GAP=.085;this.vehicles.forEach((v,idx)=>{if(v.path.length<2)return;let stopAt=null,reason='';const cur=v.path[v.seg],next=v.path[(v.seg+1)%v.path.length],prev=v.path[(v.seg-1+v.path.length)%v.path.length],after=v.path[(v.seg+2)%v.path.length];const distLeft=1-v.t;
+      const cwStop=this.crosswalkStopAhead(v);if(cwStop!==null){stopAt=cwStop;reason='횡단보도 WALK'}
+      if(stopAt===null&&!this.isAllowedAtNode(cur,next,after,v)){stopAt=.93;reason='교차로 phase 대기'}
+      for(const u of this.vehicles){if(u===v||u.seg!==v.seg||u.path[u.seg]!==v.path[v.seg]||u.path[(u.seg+1)%u.path.length]!==v.path[(v.seg+1)%v.path.length])continue;if(u.t>v.t&&u.t-v.t<GAP){stopAt=Math.min(stopAt??1,u.t-GAP);reason='앞차 간격 유지'}}
+      if(stopAt!==null&&v.t>=stopAt-STOP){v.stopped=true;v.braking=false;v.el.classList.add('stopped');v.el.classList.remove('braking');v.moveLabel=reason;return}
+      if(stopAt!==null&&stopAt-v.t<BRAKE){v.stopped=false;v.braking=true;const ratio=clamp((stopAt-v.t-STOP)/(BRAKE-STOP),0,1);v.speed=v.baseSpeed*(.1+ratio*.45);v.el.classList.remove('stopped');v.el.classList.add('braking');v.moveLabel=reason}
+      else{v.stopped=false;v.braking=false;v.speed=v.baseSpeed;v.el.classList.remove('stopped','braking');v.moveLabel=moveType(cur,next,after)==='left'?'좌회전 phase 확인':moveType(cur,next,after)==='right'?'우회전/보행자 확인':'직진 phase 확인'}
+      v.t+=v.speed;if(v.t>=1){v.t-=1;v.seg=(v.seg+1)%v.segLen}
+      const a=NODES[v.path[v.seg]],b=NODES[v.path[(v.seg+1)%v.path.length]];if(!a||!b)return;const px=a.x+(b.x-a.x)*v.t,py=a.y+(b.y-a.y)*v.t;v.el.style.left=px+'%';v.el.style.top=py+'%';v.el.style.transform='translate(-50%,-50%)'
+    })}
+  addMkr(txt,x,y,type){const m=document.createElement('div');m.className='mkr '+type;m.textContent=txt;m.style.left=x+'%';m.style.top=y+'%';this.container.appendChild(m);this.dynEls.push(m)}
+  addEffectBadge(txt,x,y){const m=document.createElement('div');m.className='effect-badge';m.textContent=txt;m.style.left=x+'%';m.style.top=y+'%';this.container.appendChild(m);this.dynEls.push(m)}
+  clear(){this.dynEls.forEach(e=>e.remove());this.dynEls=[];this.vehicles=[];this.signals={};this.sigEls={};this.phaseTags={};this.crosswalks={};Object.values(this.roadEls).forEach(r=>r.className='road')}
 }
-
-// ──────────────── 유틸 ────────────────
-function clamp(v,min,max){ return Math.max(min,Math.min(max,v)); }
-
-// ──────────────── 맵 인스턴스 생성 ────────────────
-const mapNo = new TrafficMap('mapNo', false);
-const mapAi = new TrafficMap('mapAi', true);
-
-// ──────────────── 시나리오 설정 ────────────────
-let curScen='normal';
-
-function runScenario(type){
-  curScen=type;
-  // 버튼 활성화
-  document.querySelectorAll('.sbtn').forEach(b=>b.classList.remove('active'));
-  document.getElementById('btn-'+type)?.classList.add('active');
-
-  mapNo.clear(); mapAi.clear();
-  mapNo.initTraffic(type); mapAi.initTraffic(type);
-
-  setupScenario(mapNo, type, false);
-  setupScenario(mapAi, type, true);
-
-  // UI 업데이트
-  updateEffectCards(type);
-  updateCompare(type);
-  updateFair(type);
-  updateFlowSteps(type);
-  updateLog(type);
-  updateEvents(type);
+const mapNo=new TrafficMap('mapNo',false),mapAi=new TrafficMap('mapAi',true);let curScen='normal';
+function addCoreSignals(map,type,isAI){['B','F','G','J','H','C','D','K'].forEach((id,i)=>{let profile={startIdx:i%4};let managed=['F','G','J','K','B','C','D','H'].includes(id);if(type==='emergency'&&isAI&&['B','C','D','H'].includes(id))profile.lockedPhase=roadDir('A','B')==='EW'?'EW_STRAIGHT':'NS_STRAIGHT';if(type==='accident'&&['F','J'].includes(id))profile.boost='NS';if(type==='metro'&&['G','K'].includes(id))profile.boost='NS';map.createSig(id,managed,profile)})}
+function addCrosswalks(map){CROSSWALKS.forEach(c=>map.createCrosswalk(c.id,c.road,c.pos,true))}
+function addFleet(map,items){items.forEach((it,i)=>map.addVeh(it[0],it[1],it[2],!!it[3],it[4]||{},(i*.137)%0.82))}
+function commonFleet(mult=1){const base=[
+['🚗',['A','B','C','D','H','L','K','J','I','E','A'],.008,false,{type:'승용차',speed:'45km/h'}],
+['🚌',['I','J','F','B','C','G','K','J','I'],.007,false,{type:'버스',speed:'35km/h'}],
+['🚛',['I','J','K','L','H','G','F','J','I'],.0058,false,{type:'화물트럭',speed:'32km/h'}],
+['🚗',['E','F','B','C','G','K','J','I','E'],.0068,false,{type:'승용차'}],
+['🚗',['D','H','L','K','J','F','G','C','D'],.0074,false,{type:'승용차'}],
+['🚗',['L','K','J','F','B','C','G','H','L'],.006,false,{type:'승용차'}],
+['🚕',['B','F','J','K','G','C','B'],.0078,false,{type:'택시'}],
+['🚌',['E','F','G','H','D','C','B','A','E'],.0064,false,{type:'버스'}],
+['🚗',['A','E','I','J','K','G','C','B','A'],.0067,false,{type:'승용차'}],
+['🚗',['G','F','B','C','D','H','G'],.0059,false,{type:'승용차'}],
+['🚗',['C','G','K','L','H','D','C'],.0069,false,{type:'승용차'}],
+['🚛',['K','J','F','E','I','J','K'],.0052,false,{type:'화물트럭'}],
+['🚗',['B','C','G','F','J','K','G','C','B'],.0061,false,{type:'승용차'}],
+['🚕',['H','G','F','B','C','D','H'],.0075,false,{type:'택시'}]
+];return base.slice(0,Math.round(base.length*mult))}
+function runScenario(type){curScen=type;document.querySelectorAll('.sbtn').forEach(b=>b.classList.remove('active'));document.getElementById('btn-'+type)?.classList.add('active');mapNo.clear();mapAi.clear();mapNo.initTraffic(type);mapAi.initTraffic(type);setupScenario(mapNo,type,false);setupScenario(mapAi,type,true);updateEffectCards(type);updateCompare(type);updateFair(type);updateFlowSteps(type);updateLog(type);updateEvents(type);updateCongestion()}
+function setupScenario(map,type,isAI){
+  addCoreSignals(map,type,isAI);addCrosswalks(map);
+  if(type==='normal'){if(isAI)map.addEffectBadge('AI: phase 선제 조정',42,32);addFleet(map,commonFleet(1.05))}
+  if(type==='accident'){map.addMkr('⚠️ 사고·공사',58,43,'red');if(isAI){map.addEffectBadge('AI: 우회 직진 phase 연장',34,60);map.addMkr('✦ 우회 경로',34,72,'orange');addFleet(map,[['🚗',['E','I','J','K','L','H','G','F','E'],.0075,false,{type:'승용차(우회)',aiCmd:'F-G 회피'}],['🚛',['I','J','K','L','H','G','F','J','I'],.0068,false,{type:'화물(우회)',aiCmd:'우회 재계산'}],['🚗',['A','B','G','K','J','F','E','A'],.006,false,{type:'승용차(대각 우회)'}],['🚌',['E','F','J','K','L','H','D','C','B','A','E'],.006,false,{type:'버스(우회)'}]])}else{map.addMkr('정체 대기열',47,43,'red');addFleet(map,[['🚗',['E','F','G','H','L','K','J','I','E'],.0038,false,{type:'승용차(정체)'}],['🚗',['E','F','G','H','L','K','J','I','E'],.0036,false,{type:'승용차(정체)'}],['🚗',['B','C','G','K','J','F','B'],.0037,false,{type:'승용차(정체)'}],['🚛',['I','J','K','G','F','J','I'],.0032,false,{type:'화물(정체)'}]])}addFleet(map,commonFleet(1.1))}
+  if(type==='metro'){map.addMkr('🚇 지하철 도착',58,70,'blue');if(isAI){map.addEffectBadge('버스 진행 phase + 보행자 조정',58,58);addFleet(map,[['🚌',['I','J','F','G','K','L','H','D','C','G','I'],.012,false,{type:'버스(증차)',aiCmd:'배차 단축'}],['🚌',['E','F','G','H','D','C','B','A','E'],.011,false,{type:'마을버스'}],['🚌',['L','K','G','C','D','H','L'],.0095,false,{type:'버스(증차)'}],['🚕',['K','G','F','B','C','G','K'],.01,false,{type:'택시'}]])}else{map.addMkr('버스 정체',50,58,'red');addFleet(map,[['🚌',['I','J','K','G','F','J','I'],.0044,false,{type:'버스(지연)'}],['🚌',['E','F','G','K','J','I','E'],.004,false,{type:'버스(지연)'}]])}addFleet(map,commonFleet(1.15))}
+  if(type==='emergency'){map.addMkr('🚨 긴급출동',10,16,'red');map.addMkr('🏥 목적지',82,70,isAI?'green':'yellow');if(isAI){map.addEffectBadge('긴급 경로 phase 우선 + 보행 STOP',58,16);map.addVeh('🚑',['A','B','C','D','H','L','K','J','I','E','A'],.023,true,{type:'구급차',speed:'82km/h',aiCmd:'긴급 phase 우선'},.02)}else{map.addVeh('🚑',['A','B','C','D','H','L','K','J','I','E','A'],.0078,false,{type:'구급차(신호대기)',speed:'38km/h'},.02)}addFleet(map,commonFleet(1.2))}
 }
-
-function setupScenario(map, type, isAI){
-  if(type==='normal'){
-    map.createSig('B', false, false, 28, 24);
-    map.createSig('F', true,  true,  isAI?16:28, isAI?42:24);
-    map.createSig('G', false, false, 26, 26);
-    map.createSig('J', false, false, 30, 22);
-    map.createSig('H', false, false, 24, 24);
-    if(isAI) map.addEffectBadge('AI: 혼잡 예측 제어',42,32);
-
-    // 차량 — AI/일반 같은 초기 경로, AI는 더 자연스럽게 흐름
-    const speed = 0.009;
-    map.addVeh('🚗',['A','B','C','D','H','L','K','J','I','E','A'],speed,false,{type:'승용차',speed:'52km/h',aiCmd:'정상 운행'});
-    map.addVeh('🚌',['I','J','F','B','C','G','K','J','I'],0.008,false,{type:'버스',speed:'38km/h',aiCmd:'기본 배차'});
-    map.addVeh('🚛',['I','J','K','L','H','G','F','J','I'],0.006,false,{type:'화물트럭',speed:'44km/h',aiCmd:'정상 경로'});
-    map.addVeh('🚗',['E','F','B','C','G','K','J','I','E'],0.007,false,{type:'승용차',speed:'40km/h'});
-    map.addVeh('🚗',['D','H','L','K','J','F','G','C','D'],0.008,false,{type:'승용차',speed:'36km/h'});
-    map.addVeh('🚗',['L','K','J','F','B','C','G','H','L'],0.006,false,{type:'승용차',speed:'48km/h'});
-    map.addVeh('🚗',['A','E','I','J','K','G','C','B','A'],0.007,false,{type:'승용차',speed:'45km/h'});
-    map.addVeh('🚕',['B','F','J','K','G','C','B'],0.008,false,{type:'택시',speed:'50km/h'});
-    map.addVeh('🚗',['G','F','B','C','D','H','G'],0.006,false,{type:'승용차',speed:'42km/h'});
-    map.addVeh('🚌',['E','F','G','H','D','C','B','A','E'],0.007,false,{type:'버스',speed:'35km/h'});
-  }
-
-  if(type==='accident'){
-    map.createSig('B', false, false, 28, 24);
-    map.createSig('F', true,  true,  isAI?15:28, isAI?44:20);
-    map.createSig('G', false, false, isAI?40:28, isAI?14:28);
-    map.createSig('J', true,  true,  isAI?16:30, isAI?40:20);
-    map.createSig('H', false, false, 26, 26);
-
-    map.addMkr('⚠️ 사고·공사',58,43,'red');
-
-    if(isAI){
-      map.addEffectBadge('AI: 우회 경로 활성화',34,60);
-      map.addMkr('✦ 우회 경로',34,72,'orange');
-      // AI 측: 우회 차량
-      map.addVeh('🚗',['E','I','J','K','L','H','G','F','E'],0.008,false,{type:'승용차 (우회)',speed:'38km/h',aiCmd:'F-G 우회'});
-      map.addVeh('🚛',['I','J','K','L','H','G','F','J','I'],0.007,false,{type:'화물(우회)',speed:'30km/h',aiCmd:'우회 재계산'});
-      map.addVeh('🚗',['A','B','G','K','J','F','E','A'],0.006,false,{type:'승용차 (우회)',speed:'35km/h',aiCmd:'대각 우회'});
-      map.addVeh('🚌',['E','F','J','K','L','H','D','C','B','A','E'],0.006,false,{type:'버스(우회)',speed:'28km/h',aiCmd:'우회 노선'});
-    } else {
-      map.addMkr('정체 구간',45,43,'red');
-      // 일반 측: 사고 구간 앞에 차 몰림
-      map.addVeh('🚗',['E','F','G','H','L','K','J','I','E'],0.004,false,{type:'승용차 (정체)',speed:'8km/h'});
-      map.addVeh('🚗',['B','C','G','K','J','F','B'],0.004,false,{type:'승용차 (정체)',speed:'6km/h'});
-      map.addVeh('🚛',['I','J','K','G','F','J','I'],0.003,false,{type:'화물(정체)',speed:'5km/h'});
-    }
-    // 공통 차량
-    map.addVeh('🚗',['A','B','C','D','H','L','K','J','I','E','A'],0.007,false,{type:'승용차',speed:'40km/h'});
-    map.addVeh('🚗',['D','H','G','F','J','K','L','H','D'],0.006,false,{type:'승용차',speed:'35km/h'});
-    map.addVeh('🚗',['L','K','J','F','B','A','E','I','J','L'],0.005,false,{type:'승용차',speed:'42km/h'});
-    map.addVeh('🚗',['A','E','F','G','H','D','C','B','A'],0.006,false,{type:'승용차',speed:'38km/h'});
-    map.addVeh('🚕',['B','F','J','K','G','C','B'],0.007,false,{type:'택시',speed:'45km/h'});
-    map.addVeh('🚌',['A','B','C','G','K','J','I','E','A'],0.005,false,{type:'버스',speed:'25km/h'});
-  }
-
-  if(type==='metro'){
-    map.createSig('G', true, true, isAI?12:26, isAI?50:26);
-    map.createSig('K', true, true, isAI?14:26, isAI?46:26);
-    map.createSig('B', false, false, 26, 24);
-    map.createSig('F', false, false, 24, 24);
-    map.createSig('H', false, false, 24, 24);
-
-    map.addMkr('🚇 지하철 도착',58,70,'blue');
-
-    if(isAI){
-      map.addEffectBadge('버스 우선 신호 +42초',58,58);
-      // 버스 3대 빠르게
-      map.addVeh('🚌',['I','J','F','G','K','L','H','D','C','G','I'],0.013,false,{type:'버스(증차)',speed:'28km/h',aiCmd:'배차 단축'});
-      map.addVeh('🚌',['E','F','G','H','D','C','B','A','E'],0.012,false,{type:'마을버스',speed:'26km/h',aiCmd:'순환 강화'});
-      map.addVeh('🚌',['L','K','G','C','D','H','L'],0.010,false,{type:'버스(증차)',speed:'30km/h',aiCmd:'증차 투입'});
-      map.addVeh('🚕',['K','G','F','B','C','G','K'],0.011,false,{type:'택시',speed:'40km/h',aiCmd:'역 대기 추천'});
-    } else {
-      // 일반 측: 역 주변 버스도 막힘
-      map.addVeh('🚌',['I','J','K','G','F','J','I'],0.005,false,{type:'버스(지연)',speed:'10km/h'});
-      map.addVeh('🚌',['E','F','G','K','J','I','E'],0.004,false,{type:'버스(지연)',speed:'8km/h'});
-      map.addMkr('버스 정체',50,58,'red');
-    }
-    // 공통
-    map.addVeh('🚗',['A','B','C','D','H','L','K','J','I','E','A'],0.008,false,{type:'승용차'});
-    map.addVeh('🚗',['D','H','G','F','J','K','L','H','D'],0.006,false,{type:'승용차'});
-    map.addVeh('🚗',['L','K','J','F','B','C','G','H','L'],0.006,false,{type:'승용차'});
-    map.addVeh('🚗',['A','E','F','G','H','D','A'],0.007,false,{type:'승용차'});
-    map.addVeh('🚛',['I','J','K','L','H','G','F','J','I'],0.006,false,{type:'화물트럭'});
-    map.addVeh('🚗',['B','F','J','K','G','C','B'],0.007,false,{type:'승용차'});
-    map.addVeh('🚗',['E','I','J','F','B','A','E'],0.005,false,{type:'승용차'});
-    map.addVeh('🚕',['G','K','J','F','G'],0.009,false,{type:'택시'});
-  }
-
-  if(type==='emergency'){
-    if(isAI){
-      // AI: 긴급 경로 신호 고정
-      map.createSig('B', true, true, 9999, 9999);
-      map.createSig('C', true, true, 9999, 9999);
-      map.createSig('D', true, true, 9999, 9999);
-      map.createSig('H', true, true, 9999, 9999);
-      map.createSig('F', false, false, 48, 10);
-      map.createSig('J', false, false, 46, 12);
-      map.createSig('G', false, false, 44, 14);
-      ['B','C','D','H'].forEach(id=>map.lockSig(id,'green'));
-      map.addEffectBadge('긴급 경로 신호 고정',58,16);
-      map.addMkr('🏥 목적지',82,70,'green');
-      map.addVeh('🚑',['A','B','C','D','H','L','K','J','I','E','A'],0.024,true,{type:'구급차',speed:'82km/h',aiCmd:'전구간 녹색'});
-    } else {
-      // 일반: 구급차도 신호에 걸림
-      map.createSig('B', false, false, 26, 24);
-      map.createSig('C', false, false, 24, 26);
-      map.createSig('D', false, false, 28, 22);
-      map.createSig('H', false, false, 26, 26);
-      map.createSig('F', false, false, 24, 24);
-      map.createSig('J', false, false, 26, 22);
-      map.addMkr('🏥 목적지',82,70,'yellow');
-      map.addVeh('🚑',['A','B','C','D','H','L','K','J','I','E','A'],0.009,false,{type:'구급차 (신호대기)',speed:'38km/h'});
-    }
-    map.addMkr('🚨 긴급출동',10,16,'red');
-    // 공통 차량
-    map.addVeh('🚗',['E','F','G','K','J','I','E'],0.005,false,{type:'승용차'});
-    map.addVeh('🚛',['I','J','K','L','H','G','F','J','I'],0.005,false,{type:'화물트럭'});
-    map.addVeh('🚗',['L','K','J','F','G','H','L'],0.004,false,{type:'승용차'});
-    map.addVeh('🚌',['E','F','J','K','G','F','E'],0.004,false,{type:'버스'});
-    map.addVeh('🚗',['B','C','G','F','J','K','G','C','B'],0.005,false,{type:'승용차'});
-    map.addVeh('🚗',['D','H','G','C','B','A','E','I','D'],0.006,false,{type:'승용차'});
-    map.addVeh('🚗',['A','E','F','J','K','L','H','D','A'],0.006,false,{type:'승용차'});
-    map.addVeh('🚕',['G','K','J','F','B','G'],0.007,false,{type:'택시'});
-  }
-}
-
-// ──────────────── UI 업데이트 ────────────────
-function updateEffectCards(type){
-  const d=EFFECT_DATA[type];
-  document.getElementById('ec1v').textContent=d[0];
-  document.getElementById('ec2v').textContent=d[1];
-  document.getElementById('ec3v').textContent=d[2];
-  document.getElementById('ec4v').textContent=d[3];
-  document.getElementById('ec4l').textContent=d[4]+'\n감소';
-}
-
-function updateCompare(type){
-  const rows=COMPARE_DATA[type]||[];
-  document.getElementById('cmpBar').innerHTML=rows.map(([k,b,a])=>
-    `<div class="cmp-row2"><span class="cmp-label">${k}</span><span class="cmp-no">${b}</span><span class="cmp-yes">${a}</span></div>`
-  ).join('');
-}
-
-function updateFair(type){
-  const d=FAIR_DATA[type]||FAIR_DATA.normal;
-  document.getElementById('fairRows').innerHTML=d.map(([l,v])=>
-    `<div class="fair-row"><span class="fair-label">${l}</span><div class="fair-track"><div class="fair-fill" data-w="${v}%"></div></div><span class="fair-val">${v}</span></div>`
-  ).join('');
-  requestAnimationFrame(()=>requestAnimationFrame(()=>{
-    document.querySelectorAll('.fair-fill').forEach(e=>{ e.style.width=e.dataset.w; });
-  }));
-}
-
-function updateFlowSteps(type){
-  const active=FLOW_STEPS_DATA[type]||[1];
-  [1,2,3,4].forEach(i=>{
-    document.getElementById('fs'+i)?.classList.toggle('active',active.includes(i));
-  });
-}
-
-let logTimer=null;
-function updateLog(type){
-  const items=LOG_DATA[type]||[];
-  const list=document.getElementById('logList');
-  list.innerHTML='';
-  const now=new Date();
-  items.forEach((item,i)=>{
-    setTimeout(()=>{
-      const d=new Date(now-(items.length-1-i)*3200);
-      const ts=[d.getHours(),d.getMinutes(),d.getSeconds()].map(n=>String(n).padStart(2,'0')).join(':');
-      const [tag,txt]=item;
-      const tagCls=tag==='AI'?'ai':tag==='경고'?'warn':'ok';
-      const div=document.createElement('div'); div.className='log-item';
-      div.innerHTML=`<span class="li-time">${ts}</span><span class="li-tag ${tagCls}">${tag}</span><span class="li-text">${txt}</span>`;
-      list.prepend(div);
-      // 최대 5개
-      while(list.children.length>5) list.removeChild(list.lastChild);
-    },i*200);
-  });
-}
-
-let evIdx=0;
-function updateEvents(type){
-  evIdx=0;
-  renderEvents(type);
-}
-
-function renderEvents(type){
-  const arr=EVENT_DATA[type]||EVENT_DATA.normal;
-  const pick=[];
-  for(let i=0;i<3;i++) pick.push(arr[(evIdx+i)%arr.length]);
-  const now=new Date();
-  document.getElementById('eventList').innerHTML=pick.map((t,i)=>{
-    return `<div class="ev-item"><span>${t.slice(0,2)}</span><span>${t.slice(3)}</span><small>${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String((now.getSeconds()+i*3)%60).padStart(2,'0')}</small></div>`;
-  }).join('');
-  evIdx++;
-}
-
-// ──────────────── 혼잡도 표시 ────────────────
-function updateCongestion(){
-  const no=mapNo.avgCongestion();
-  const ai=mapAi.avgCongestion();
-  document.getElementById('congNo').textContent=`혼잡도 ${no}%`;
-  document.getElementById('congAi').textContent=`혼잡도 ${ai}%`;
-}
-
-// ──────────────── 메인 루프 ────────────────
-let loopId=null, slowId=null, evId=null;
-
-function startLoop(){
-  if(loopId) clearInterval(loopId);
-  if(slowId) clearInterval(slowId);
-  if(evId) clearInterval(evId);
-  loopId = setInterval(()=>{
-    mapNo.tickSignals(); mapNo.tickVehicles();
-    mapAi.tickSignals(); mapAi.tickVehicles();
-  }, TICK);
-  slowId = setInterval(()=>{
-    mapNo.updateTraffic(); mapAi.updateTraffic();
-    updateCongestion();
-  }, 1000);
-  evId = setInterval(()=>renderEvents(curScen), 2400);
-}
-
-// 초기 실행
-runScenario('normal');
-startLoop();
+function updateEffectCards(type){const d=EFFECT_DATA[type];ec1v.textContent=d[0];ec2v.textContent=d[1];ec3v.textContent=d[2];ec4v.textContent=d[3];ec4l.textContent=d[4]+'\n감소'}
+function updateCompare(type){cmpBar.innerHTML=(COMPARE_DATA[type]||[]).map(([k,b,a])=>`<div class="cmp-row2"><span class="cmp-label">${k}</span><span class="cmp-no">${b}</span><span class="cmp-yes">${a}</span></div>`).join('')}
+function updateFair(type){fairRows.innerHTML=(FAIR_DATA[type]||FAIR_DATA.normal).map(([l,v])=>`<div class="fair-row"><span class="fair-label">${l}</span><div class="fair-track"><div class="fair-fill" data-w="${v}%"></div></div><span class="fair-val">${v}</span></div>`).join('');requestAnimationFrame(()=>requestAnimationFrame(()=>document.querySelectorAll('.fair-fill').forEach(e=>e.style.width=e.dataset.w)))}
+function updateFlowSteps(type){const active=type==='normal'?[1,2]:[1,2,3,4];[1,2,3,4].forEach(i=>document.getElementById('fs'+i)?.classList.toggle('active',active.includes(i)))}
+function updateLog(type){const items=LOG_DATA[type]||[],list=logList;list.innerHTML='';const now=new Date();items.forEach((item,i)=>setTimeout(()=>{const d=new Date(now-(items.length-1-i)*3200),ts=[d.getHours(),d.getMinutes(),d.getSeconds()].map(n=>String(n).padStart(2,'0')).join(':'),tag=item[0],txt=item[1],tagCls=tag==='AI'?'ai':tag==='경고'?'warn':'ok';const div=document.createElement('div');div.className='log-item';div.innerHTML=`<span class="li-time">${ts}</span><span class="li-tag ${tagCls}">${tag}</span><span class="li-text">${txt}</span>`;list.prepend(div);while(list.children.length>5)list.removeChild(list.lastChild)},i*180))}
+let evIdx=0;function updateEvents(type){evIdx=0;renderEvents(type)}
+function renderEvents(type){const arr=EVENT_DATA[type]||EVENT_DATA.normal,pick=[];for(let i=0;i<3;i++)pick.push(arr[(evIdx+i)%arr.length]);const now=new Date();eventList.innerHTML=pick.map((t,i)=>`<div class="ev-item"><span>${t.slice(0,2)}</span><span>${t.slice(3)}</span><small>${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String((now.getSeconds()+i*3)%60).padStart(2,'0')}</small></div>`).join('');evIdx++}
+function updateCongestion(){congNo.textContent=`혼잡도 ${mapNo.avgCongestion()}%`;congAi.textContent=`혼잡도 ${mapAi.avgCongestion()}%`}
+let loopId=null,slowId=null,evId=null;function startLoop(){if(loopId)clearInterval(loopId);if(slowId)clearInterval(slowId);if(evId)clearInterval(evId);loopId=setInterval(()=>{mapNo.tickSignals();mapNo.tickVehicles();mapAi.tickSignals();mapAi.tickVehicles()},TICK);slowId=setInterval(()=>{mapNo.updateTraffic();mapAi.updateTraffic();updateCongestion()},1000);evId=setInterval(()=>renderEvents(curScen),2400)}
+runScenario('normal');startLoop();
 </script>
 </body>
 </html>
